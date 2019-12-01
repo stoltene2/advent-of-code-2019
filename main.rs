@@ -1,12 +1,49 @@
 
 fn main() {
     let result = modules().iter().fold(0.0, |total, module| total + required_fuel(module));
-    println!("You will need, {}", result);
+    println!("Pt.1 You will need, {}", result);
+
+    let result_pt_2 = modules()
+        .iter()
+        .fold(0.0, |total, module| total + total_fuel_for_module(module));
+
+    println!("Pt.2 You will need, {}", result_pt_2);
 }
 
-
+// Calculates fuel cost for a module
 fn required_fuel(x: &f32) -> f32 {
     return (x / 3.0).floor() - 2.0;
+}
+
+// Calculates fuel needed for a module and for all fuel required to
+// lift the fuel.
+fn total_fuel_for_module(mass: &f32) -> f32 {
+    Fuel::new(mass).sum()
+}
+
+struct Fuel {
+    fuel: f32,
+}
+
+impl Fuel {
+    fn new(mass: &f32) -> Fuel {
+        Fuel { fuel: required_fuel(mass) }
+    }
+}
+
+impl Iterator for Fuel {
+    type Item = f32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+
+        if self.fuel >= 1.0 {
+            let orig_fuel = self.fuel;
+            self.fuel = required_fuel(&orig_fuel);
+            Some(orig_fuel)
+        } else {
+            None
+        }
+    }
 }
 
 fn modules() -> Vec<f32> {
@@ -117,12 +154,20 @@ fn modules() -> Vec<f32> {
 #[cfg(test)]
 mod tests {
     use crate::required_fuel;
+    use crate::total_fuel_for_module;
 
     #[test]
-    fn it_works() {
+    fn test_required_fuel() {
         assert_eq!(required_fuel(&12_f32), 2_f32);
         assert_eq!(required_fuel(&14_f32), 2_f32);
         assert_eq!(required_fuel(&1969_f32), 654_f32);
         assert_eq!(required_fuel(&100756_f32), 33583_f32);
+    }
+
+    #[test]
+    fn test_total_fuel() {
+        assert_eq!(total_fuel_for_module(&12_f32), 2_f32);
+        assert_eq!(total_fuel_for_module(&1969_f32), 966_f32);
+        assert_eq!(total_fuel_for_module(&100756_f32), 50346_f32);
     }
 }
