@@ -1,24 +1,43 @@
 
 fn main() {
-    let result = modules().iter().fold(0.0, |total, module| total + required_fuel(module));
+    let result = modules().iter().fold(0.0, |total, module| total + required_fuel(*module));
     println!("Pt.1 You will need, {}", result);
 
     let result_pt_2 = modules()
         .iter()
-        .fold(0.0, |total, module| total + total_fuel_for_module(module));
+        .fold(0.0, |total, module| total + total_fuel_for_module(*module));
 
     println!("Pt.2 You will need, {}", result_pt_2);
+
+    let result_pt_2_rec = modules()
+        .iter()
+        .fold(0.0, |total, module| total + total_fuel_for_module_rec(*module));
+
+    println!("Pt.2(recursive) You will need, {}", result_pt_2_rec);
+
 }
 
 // Calculates fuel cost for a module
-fn required_fuel(x: &f32) -> f32 {
+fn required_fuel(x: f32) -> f32 {
     return (x / 3.0).floor() - 2.0;
 }
 
 // Calculates fuel needed for a module and for all fuel required to
 // lift the fuel.
-fn total_fuel_for_module(mass: &f32) -> f32 {
+fn total_fuel_for_module(mass: f32) -> f32 {
     Fuel::new(mass).sum()
+}
+
+fn total_fuel_for_module_rec(mass: f32) -> f32 {
+    step(0.0, required_fuel(mass))
+}
+
+fn step(total: f32, fuel: f32) -> f32 {
+    if fuel > 0.0 {
+        step(total + fuel, required_fuel(fuel))
+    } else {
+        total
+    }
 }
 
 struct Fuel {
@@ -26,8 +45,8 @@ struct Fuel {
 }
 
 impl Fuel {
-    fn new(mass: &f32) -> Fuel {
-        Fuel { fuel: required_fuel(mass) }
+    fn new(module_mass: f32) -> Fuel {
+        Fuel { fuel: required_fuel(module_mass) }
     }
 }
 
@@ -35,10 +54,9 @@ impl Iterator for Fuel {
     type Item = f32;
 
     fn next(&mut self) -> Option<Self::Item> {
-
         if self.fuel >= 1.0 {
             let orig_fuel = self.fuel;
-            self.fuel = required_fuel(&orig_fuel);
+            self.fuel = required_fuel(orig_fuel);
             Some(orig_fuel)
         } else {
             None
@@ -153,21 +171,27 @@ fn modules() -> Vec<f32> {
 
 #[cfg(test)]
 mod tests {
-    use crate::required_fuel;
-    use crate::total_fuel_for_module;
+    use crate::*;
 
     #[test]
     fn test_required_fuel() {
-        assert_eq!(required_fuel(&12_f32), 2_f32);
-        assert_eq!(required_fuel(&14_f32), 2_f32);
-        assert_eq!(required_fuel(&1969_f32), 654_f32);
-        assert_eq!(required_fuel(&100756_f32), 33583_f32);
+        assert_eq!(required_fuel(12_f32), 2_f32);
+        assert_eq!(required_fuel(14_f32), 2_f32);
+        assert_eq!(required_fuel(1969_f32), 654_f32);
+        assert_eq!(required_fuel(100756_f32), 33583_f32);
     }
 
     #[test]
     fn test_total_fuel() {
-        assert_eq!(total_fuel_for_module(&12_f32), 2_f32);
-        assert_eq!(total_fuel_for_module(&1969_f32), 966_f32);
-        assert_eq!(total_fuel_for_module(&100756_f32), 50346_f32);
+        assert_eq!(total_fuel_for_module(12_f32), 2_f32);
+        assert_eq!(total_fuel_for_module(1969_f32), 966_f32);
+        assert_eq!(total_fuel_for_module(100756_f32), 50346_f32);
+    }
+
+    #[test]
+    fn test_total_fuel_recursive() {
+        assert_eq!(total_fuel_for_module_rec(12_f32), 2_f32);
+        assert_eq!(total_fuel_for_module_rec(1969_f32), 966_f32);
+        assert_eq!(total_fuel_for_module_rec(100756_f32), 50346_f32);
     }
 }
