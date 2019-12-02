@@ -4,6 +4,7 @@ let
   nixPackages = [
     pkgs.rustc
     pkgs.cargo
+    pkgs.rustfmt
   ];
 in
 pkgs.stdenv.mkDerivation {
