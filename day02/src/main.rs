@@ -3,12 +3,30 @@ fn main() {
 }
 
 fn execute_program(mut p: Vec<usize>) -> Vec<usize> {
+    const HALT: usize = 99;
+    const ADD: usize = 1;
+    const MUL: usize = 2;
+
     let intcode = p[0];
-    let fst_ptr = p[1];
-    let snd_ptr = p[2];
-    let mem_ptr = p[3];
-    p[mem_ptr] = p[fst_ptr] + p[snd_ptr];
-    p
+
+    match intcode {
+        HALT => p,
+        ADD => {
+            let fst_ptr = p[1];
+            let snd_ptr = p[2];
+            let mem_ptr = p[3];
+            p[mem_ptr] = p[fst_ptr] + p[snd_ptr];
+            p
+        },
+        MUL => {
+            let fst_ptr = p[1];
+            let snd_ptr = p[2];
+            let mem_ptr = p[3];
+            p[mem_ptr] = p[fst_ptr] * p[snd_ptr];
+            p
+        },
+        _ => p
+    }
 }
 
 fn input_program() -> Vec<usize> {
