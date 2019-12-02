@@ -7,26 +7,27 @@ fn execute_program(mut p: Vec<usize>) -> Vec<usize> {
     const ADD: usize = 1;
     const MUL: usize = 2;
 
-    let intcode = p[0];
+    for instr_offset in (0..p.len()).step_by(4) {
+        let intcode = p[instr_offset];
 
-    match intcode {
-        HALT => p,
-        ADD => {
-            let fst_ptr = p[1];
-            let snd_ptr = p[2];
-            let mem_ptr = p[3];
-            p[mem_ptr] = p[fst_ptr] + p[snd_ptr];
-            p
-        },
-        MUL => {
-            let fst_ptr = p[1];
-            let snd_ptr = p[2];
-            let mem_ptr = p[3];
-            p[mem_ptr] = p[fst_ptr] * p[snd_ptr];
-            p
-        },
-        _ => p
+        if intcode == HALT { break; }
+
+        let fst_ptr = p[instr_offset + 1];
+        let snd_ptr = p[instr_offset + 2];
+        let mem_ptr = p[instr_offset + 3];
+
+        match intcode {
+            ADD => {
+                p[mem_ptr] = p[fst_ptr] + p[snd_ptr];
+            },
+            MUL => {
+                p[mem_ptr] = p[fst_ptr] * p[snd_ptr];
+            },
+            _ => ()
+        }
     }
+
+    p
 }
 
 fn input_program() -> Vec<usize> {
@@ -66,10 +67,10 @@ mod tests {
 
     #[test]
     fn test_addition_intcode() {
-        assert_eq!(execute_program(vec![1,0,0,0,99]), vec![2,0,0,0,99]);
-        assert_eq!(execute_program(vec![99]), vec![99]);
-        assert_eq!(execute_program(vec![99, 1, 0, 0, 0]), vec![99, 1, 0, 0, 0]);
-        assert_eq!(execute_program(vec![2,3,0,3,99]), vec![2,3,0,6,99]);
-        assert_eq!(execute_program(vec![1,1,1,4,99,5,6,0,99]), vec![30,1,1,4,2,5,6,0,99]);
+        assert_eq!(vec![2,0,0,0,99], execute_program(vec![1,0,0,0,99]));
+        assert_eq!(vec![99], execute_program(vec![99]));
+        assert_eq!(vec![99, 1, 0, 0, 0], execute_program(vec![99, 1, 0, 0, 0]));
+        assert_eq!(vec![2,3,0,6,99], execute_program(vec![2,3,0,3,99]));
+        assert_eq!(vec![30,1,1,4,2,5,6,0,99], execute_program(vec![1,1,1,4,99,5,6,0,99]));
     }
 }
