@@ -8,14 +8,16 @@ fn main() {
     let first_intcode = execute_program(memory)[0];
     println!("Resulting intcode: {}", first_intcode);
 
-    println!("Part 2 intcode: {}", find_magic());
+    match find_magic() {
+        Some(result) => println!("Part 2 intcode: {}", result),
+        None => println!("No magic found")
+    }
 }
 
-fn find_magic() -> usize {
+fn find_magic() -> Option<usize> {
     const DESIRED_OUTPUT: usize = 19_690_720;
-    let mut result: usize = 0;
 
-    'outer: for noun in 0..100 {
+    for noun in 0..100 {
         for verb in 0..100 {
             let mut memory = computer_memory();
 
@@ -25,13 +27,12 @@ fn find_magic() -> usize {
             let first_intcode = execute_program(memory)[0];
 
             if first_intcode == DESIRED_OUTPUT {
-                result = 100 * noun + verb;
-                break 'outer;
+                return Some(100 * noun + verb);
             }
         }
     }
 
-    result
+    None
 }
 
 fn execute_program(mut memory: Vec<usize>) -> Vec<usize> {
