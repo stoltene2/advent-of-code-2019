@@ -31,6 +31,16 @@ fn gen_wire_coordinates(diagram: Vec<&str>) -> Vec<(i32, i32)> {
     })
 }
 
+// TODO: I might be able to just return an iterator here
+fn gen_wire_segments(coordinates: Vec<(i32, i32)>) -> Vec<((i32, i32), (i32, i32))> {
+    let c2 = coordinates.clone();
+
+    coordinates
+        .into_iter()
+        .zip(c2.into_iter().skip(1))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use crate::*;
@@ -52,5 +62,15 @@ mod tests {
     fn test_gen_wire_coordinates() {
         assert_eq!(gen_wire_coordinates(vec!["R1", "U1", "L1", "D1"]), vec![(0, 0), (1, 0), (1, 1), (0, 1), (0, 0)]);
         assert_eq!(gen_wire_coordinates("R1,U1,L1,D1".split(",").collect()), vec![(0, 0), (1, 0), (1, 1), (0, 1), (0, 0)]);
+    }
+
+    #[test]
+    fn test_gen_wire_segments() {
+        assert_eq!(gen_wire_segments(vec![(0, 0), (0, 1)]), vec![((0, 0), (0, 1))]);
+        assert_eq!(gen_wire_segments(vec![(0, 0), (0, 1), (1, 1)]),
+                   vec![
+                       ((0, 0), (0, 1)),
+                       ((0, 1), (1, 1)),
+                   ]);
     }
 }
