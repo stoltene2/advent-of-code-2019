@@ -11,9 +11,11 @@ pkgs.stdenv.mkDerivation {
   builder = "${pkgs.bash}/bin/bash";
   args = [ ./builder.sh ];
   src = ./main.rs;
+  cargoFile = ./Cargo.toml;
   system = builtins.currentSystem;
-  rustc = pkgs.rustc;
+  cargo = pkgs.cargo;
   gcc = pkgs.gcc;
   coreutils = pkgs.coreutils;
   buildInputs = nixPackages;
+  propagatedBuildInputs = [pkgs.pngquant];
 }
