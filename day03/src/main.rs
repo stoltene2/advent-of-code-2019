@@ -15,6 +15,22 @@ fn find_coordinate(point: (i32, i32), dir: &str) -> Option<(i32, i32)> {
     }
 }
 
+fn gen_wire_coordinates(diagram: Vec<&str>) -> Vec<(i32, i32)> {
+    let mut wires: Vec<(i32, i32)> = Vec::new();
+    wires.push((0, 0));
+
+    diagram.iter().fold(wires, |mut w, dir| {
+        let coord = w.last().unwrap_or(&(0, 0));
+        match find_coordinate(*coord, dir) {
+            Some(next) => {
+                w.push(next);
+                w
+            },
+            _ => w
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use crate::*;
@@ -32,5 +48,9 @@ mod tests {
         assert_eq!(find_coordinate((-10, -10), "D1"), Some((-10, -11)));
     }
 
+    #[test]
+    fn test_gen_wire_coordinates() {
+        assert_eq!(gen_wire_coordinates(vec!["R1", "U1", "L1", "D1"]), vec![(0, 0), (1, 0), (1, 1), (0, 1), (0, 0)]);
+        assert_eq!(gen_wire_coordinates("R1,U1,L1,D1".split(",").collect()), vec![(0, 0), (1, 0), (1, 1), (0, 1), (0, 0)]);
     }
 }
