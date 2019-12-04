@@ -6,7 +6,6 @@ fn main() {
         Some(min_point) => println!("Min intersection point: {}", min_point),
         _ => println!("No min found"),
     }
-
 }
 
 fn wire_1() -> &'static str {
@@ -60,7 +59,6 @@ fn find_intersection(
     (s1p1, s1p2): ((i32, i32), (i32, i32)),
     (s2p1, s2p2): ((i32, i32), (i32, i32)),
 ) -> Option<(i32, i32)> {
-
     let ((s1_x1, s1_y1), (s1_x2, s1_y2)) = order_points(s1p1, s1p2);
     let ((s2_x1, s2_y1), (s2_x2, s2_y2)) = order_points(s2p1, s2p2);
 
@@ -69,7 +67,7 @@ fn find_intersection(
         // println!("({}, {}), ({}, {})", s2_x1, s2_y1, s2_x2, s2_y2);
         // println!("==top ({}, {})", s1_x1, s2_y1);
         Some((s1_x1, s2_y1))
-    } else if (s1_x1 <= s2_x1 && s2_x1 <= s1_x2) && (s2_y1 <= s1_y1 && s1_y1 <= s2_y2 ) {
+    } else if (s1_x1 <= s2_x1 && s2_x1 <= s1_x2) && (s2_y1 <= s1_y1 && s1_y1 <= s2_y2) {
         // println!("({}, {}), ({}, {})", s1_x1, s1_y1, s1_x2, s1_y2);
         // println!("({}, {}), ({}, {})", s2_x1, s2_y1, s2_x2, s2_y2);
         // println!("==bot ({}, {})", s2_x1, s1_y1);
@@ -116,8 +114,8 @@ fn find_min_intersections(w1: Vec<&str>, w2: Vec<&str>) -> Option<i32> {
                 Some((x, y)) => {
                     println!("({}, {})", x, y);
                     results.push(x.abs() + y.abs());
-                },
-                None => ()
+                }
+                None => (),
             }
         }
     }
@@ -163,7 +161,6 @@ mod tests {
             gen_wire_coordinates("U7,R6,D4,L4".split(",").collect()),
             vec![(0, 0), (0, 7), (6, 7), (6, 3), (2, 3)]
         );
-
     }
 
     #[test]
@@ -189,10 +186,7 @@ mod tests {
 
     #[test]
     fn test_wire_intersections() {
-        assert_eq!(
-            find_intersection(((0, 0), (0, 1)), ((1, 0), (1, 1))),
-            None
-        );
+        assert_eq!(find_intersection(((0, 0), (0, 1)), ((1, 0), (1, 1))), None);
 
         // Intersects at right angle
         assert_eq!(
@@ -256,11 +250,7 @@ mod tests {
         );
 
         // From errors in my degugging
-        assert_eq!(
-            find_intersection(((0, 0), (8, 0)), ((6, 3), (6, 7))),
-            None
-        );
-
+        assert_eq!(find_intersection(((0, 0), (8, 0)), ((6, 3), (6, 7))), None);
     }
 
     #[test]
@@ -272,7 +262,9 @@ mod tests {
 
     #[test]
     fn test_find_min_intersections_example2() {
-        let w1 = "R98,U47,R26,D63,R33,U87,L62,D20,R33,U53,R51".split(",").collect();
+        let w1 = "R98,U47,R26,D63,R33,U87,L62,D20,R33,U53,R51"
+            .split(",")
+            .collect();
         let w2 = "U98,R91,D20,R16,D67,R40,U7,R15,U6,R7".split(",").collect();
         assert_eq!(find_min_intersections(w1, w2), Some(135));
     }
@@ -283,5 +275,4 @@ mod tests {
         let w2 = "U7,R6,D4,L4".split(",").collect();
         assert_eq!(find_min_intersections(w1, w2), Some(6));
     }
-
 }
