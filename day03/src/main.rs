@@ -63,14 +63,8 @@ fn find_intersection(
     let ((s2_x1, s2_y1), (s2_x2, s2_y2)) = order_points(s2p1, s2p2);
 
     let res = if (s2_x1 <= s1_x1 && s1_x1 <= s2_x2) && (s1_y1 <= s2_y1 && s2_y1 <= s1_y2) {
-        // println!("({}, {}), ({}, {})", s1_x1, s1_y1, s1_x2, s1_y2);
-        // println!("({}, {}), ({}, {})", s2_x1, s2_y1, s2_x2, s2_y2);
-        // println!("==top ({}, {})", s1_x1, s2_y1);
         Some((s1_x1, s2_y1))
     } else if (s1_x1 <= s2_x1 && s2_x1 <= s1_x2) && (s2_y1 <= s1_y1 && s1_y1 <= s2_y2) {
-        // println!("({}, {}), ({}, {})", s1_x1, s1_y1, s1_x2, s1_y2);
-        // println!("({}, {}), ({}, {})", s2_x1, s2_y1, s2_x2, s2_y2);
-        // println!("==bot ({}, {})", s2_x1, s1_y1);
         Some((s2_x1, s1_y1))
     } else {
         None
@@ -78,10 +72,8 @@ fn find_intersection(
 
     // Don't count intersections at the origin
     if res == Some((0, 0)) {
-        // println!("==res==== skip");
         None
     } else {
-        // println!("==res==== ({}, {})", res.unwrap_or((1000, 1000)).0, res.unwrap_or((1000, 1000)).1);
         res
     }
 }
@@ -112,7 +104,6 @@ fn find_min_intersections(w1: Vec<&str>, w2: Vec<&str>) -> Option<i32> {
         for s2 in w2_segs.iter() {
             match find_intersection(s1, *s2) {
                 Some((x, y)) => {
-                    println!("({}, {})", x, y);
                     results.push(x.abs() + y.abs());
                 }
                 None => (),
@@ -121,6 +112,61 @@ fn find_min_intersections(w1: Vec<&str>, w2: Vec<&str>) -> Option<i32> {
     }
 
     results.into_iter().min()
+}
+
+fn find_lowest_power_intersection(w1: Vec<&str>, w2: Vec<&str>) -> Option<i32> {
+    let w1_segs = gen_wire_segments(gen_wire_coordinates(w1));
+    let w2_segs = gen_wire_segments(gen_wire_coordinates(w2));
+
+    let mut results = Vec::new();
+
+    for s1 in w1_segs.iter() {
+        for s2 in w2_segs.iter() {
+            match find_intersection(*s1, *s2) {
+                Some((x, y)) => {
+                    println!("({}, {})", x, y);
+                    println!("Dist to first {}", dist_to_point(&w1_segs, &(x,y)));
+                    println!("Dist to second {}", dist_to_point(&w2_segs, &(x,y)));
+                    println!("---------------");
+                    results.push(dist_to_point(&w1_segs, &(x,y)) + dist_to_point(&w2_segs, &(x,y)))
+                }
+                None => (),
+            }
+        }
+    }
+
+    results.into_iter().min()
+
+}
+
+fn dist_to_point(w: &Vec<((i32, i32), (i32, i32))>, p: &(i32, i32)) -> i32 {
+    let mut dist = 0;
+
+  for ((x1, y1), (x2, y2)) in w {
+   // for (p1, p2) in w {
+   //     let ((x1, y1), (x2, y2)) = order_points(*p1, *p2);
+
+      // if x1 <= p.0 && p.0 <= x2 && y1 <= p.1 && p.1 <= y2 {
+      if x1 <= &p.0 && &p.0 <= x2 && y1 <= &p.1 && &p.1 <= y2 {
+          // in segment
+
+          // problem here is that I'm approaching from the right. This
+          // is causing all totals to get messed up. Need to handle
+          // two scenarios depending on if point is ordered or not.
+          // there might be a bug with find_intersections swapping points
+          println!("in seg, {}, p0={}, x1={}, p1={}, y1={}", (p.0 - x1).abs() + (p.1 - y1).abs(), p.0, x1, p.1, y1);
+            //dist += (p.0).abs() - x1.abs() + (p.1).abs() - y1.abs();
+
+          dist += (p.0 - x1).abs() + (p.1 - y1).abs();
+//            dist += (p.0 - x2).abs() + (p.1 - y1).abs();
+            break;
+        } else {
+            println!("not in seg, {}", (x2 - x1).abs() + (y2 - y1).abs());
+            dist += (x2 - x1).abs() + (y2 - y1).abs();
+        }
+    }
+
+    dist
 }
 
 #[cfg(test)]
@@ -275,4 +321,27 @@ mod tests {
         let w2 = "U7,R6,D4,L4".split(",").collect();
         assert_eq!(find_min_intersections(w1, w2), Some(6));
     }
+
+    #[test]
+    fn test_dist_to_point() {
+        assert_eq!(dist_to_point(&vec![((0,0), (0, 2)), ((0, 2), (2, 2))], &(1, 2)), 3);
+
+        assert_eq!(dist_to_point(&vec![((0,0), (8, 0)), ((8, 0), (8, 5)), ((8, 5), (3, 5))], &(6, 5)), 15);
+    }
+
+    #[test]
+    fn test_find_lowest_power_intersection_text_example1() {
+        let w1 = "R75,D30,R83,U83,L12,D49,R71,U7,L72".split(",").collect();
+        let w2 = "U62,R66,U55,R34,D71,R55,D58,R83".split(",").collect();
+        assert_eq!(find_lowest_power_intersection(w1, w2), Some(610));
+    }
+
+    #[test]
+    fn test_find_lowest_power_intersection_text_example() {
+        let w1 = "R8,U5,L5,D3".split(",").collect();
+        let w2 = "U7,R6,D4,L4".split(",").collect();
+        assert_eq!(find_lowest_power_intersection(w1, w2), Some(30));
+    }
+
+
 }
