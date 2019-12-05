@@ -65,7 +65,6 @@ fn gen_wire_coordinates(diagram: Vec<&str>) -> Vec<(i32, i32)> {
     })
 }
 
-// TODO: I might be able to just return an iterator here
 fn gen_wire_segments(coordinates: Vec<(i32, i32)>) -> Vec<((i32, i32), (i32, i32))> {
     let c2 = coordinates.clone();
 
@@ -115,7 +114,6 @@ fn order_points(p1: (i32, i32), p2: (i32, i32)) -> ((i32, i32), (i32, i32)) {
 }
 
 fn order_points_dir(p1: (i32, i32), p2: (i32, i32)) -> Dir {
-    // println!("order points dir: ({}, {}) ({}, {})", p1.0, p1.1, p2.0, p2.1);
     if p1.1 == p2.1 {
         if p1.0 < p2.0 {
             Dir::Right
@@ -161,10 +159,6 @@ fn find_lowest_power_intersection(w1: Vec<&str>, w2: Vec<&str>) -> Option<i32> {
         for s2 in w2_segs.iter() {
             match find_intersection(*s1, *s2) {
                 Some((x, y)) => {
-                    // println!("({}, {})", x, y);
-                    // println!("Dist to first {}", dist_to_point(&w1_segs, &(x,y)));
-                    // println!("Dist to second {}", dist_to_point(&w2_segs, &(x,y)));
-                    // println!("---------------");
                     results.push(dist_to_point(&w1_segs, &(x,y)) + dist_to_point(&w2_segs, &(x,y)))
                 }
                 None => (),
@@ -181,30 +175,15 @@ fn dist_to_point(w: &Vec<((i32, i32), (i32, i32))>, p: &(i32, i32)) -> i32 {
     for ((x1, y1), (x2, y2)) in w {
         let dir = order_points_dir((*x1, *y1), (*x2, *y2));
 
-        // match dir {
-        //     // Wow, without the namespace these do bad things.
-        //     // Is it because I'm in main? How to use just Down, Right,...
-        //     Dir::Down => println!("Down"),
-        //     Dir::Up => println!("Up"),
-        //     Dir::Left => println!("Left"),
-        //     Dir::Right => println!("Right"),
-        // };
-
         if (x1 <= &p.0 && &p.0 <= x2 && y1 <= &p.1 && &p.1 <= y2) ||
            (x2 <= &p.0 && &p.0 <= x1 && y2 <= &p.1 && &p.1 <= y1) {
             let units = match dir {
-                // Wow, without the namespace these do bad things.
-                // Is it because I'm in main? How to use just Down, Right,...
-                // Always defaults to the first case. Maybe internally stored as 0?
-                // TODO: Make a test case for this case, Dir::Down
                 Dir::Down => (y1 - p.1).abs(), // this could be wrong?
                 Dir::Up => (p.1 - y1).abs(),
                 Dir::Left => (p.0 - x1).abs(),
                 Dir::Right => (p.0 - x1).abs(),
             };
             dist += units;
-            // println!("in seg, {}, {}", units, dist);
-
             break;
         } else {
             dist += (x2 - x1).abs() + (y2 - y1).abs();
