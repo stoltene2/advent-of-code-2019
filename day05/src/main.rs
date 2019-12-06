@@ -49,40 +49,35 @@ fn execute_instruction(memory: &mut Vec<i32>, instruction_pointer: &usize, outpu
     match Instruction::parse(memory[*instruction_pointer]) {
         // Parameters that an instruction writes to will never be in immediate mode.
         Instruction::Add(a1, a2) => {
-            println!("Add");
             let param1 = mem_lookup(memory, &a1, &(ip + 1));
             let param2 = mem_lookup(memory, &a2, &(ip + 2));
             let result_addr: usize = memory[ip + 3].try_into().unwrap();
 
             memory[result_addr] = param1 + param2;
-            *instruction_pointer + 4
+            4
         },
         Instruction::Multiply(a1, a2) => {
-            println!("Multiply");
             let param1 = mem_lookup(memory, &a1, &(ip + 1));
             let param2 = mem_lookup(memory, &a2, &(ip + 2));
             let result_addr: usize = memory[ip + 3].try_into().unwrap();
 
             memory[result_addr] = param1 * param2;
-            *instruction_pointer + 4
+            4
         },
         Instruction::Input => {
-            println!("Input");
             let input = 1;
             let result_addr: usize = memory[ip + 1].try_into().unwrap();
             memory[result_addr] = input;
-            *instruction_pointer + 2
+            2
         },
         Instruction::Output => {
-            println!("Output");
-            output.push(mem_lookup(memory, &Address::Position, &(ip + 1)));
-            *instruction_pointer + 2
+            let code = mem_lookup(memory, &Address::Position, &(ip + 1));
+            output.push(code);
+            2
         },
         Instruction::Halt => {
-            println!("halting: ip={}", ip);
-            ip
+            0
         },
-        _ => panic!("Unknow instruction")
     }
 }
 
@@ -97,7 +92,9 @@ fn mem_lookup(memory: &Vec<i32>, addr_type: &Address, instruction_pointer: &usiz
 }
 
 fn main() {
-
+    let mut output: Vec<i32> = Vec::new();
+    execute_program(computer_memory(), &mut output);
+    println!("{:?}", output);
 }
 
 fn execute_program(mut memory: Vec<i32>, output: &mut Vec<i32>) -> Vec<i32> {
@@ -231,11 +228,19 @@ mod tests {
     }
 
     #[test]
-    fn test_execute_program_with_immediate_values_from_example() {
+    fn test_execute_program_with_immediate_values_from_example1() {
         // Inputs hardcoded 1, this should output that 1
         let mut output: Vec<i32> = Vec::new();
         assert_eq!([1101, 100, -1, 4, 99], *execute_program(vec![1101, 100, -1, 4, 0], &mut output));
     }
+
+    #[test]
+    fn test_execute_program_with_immediate_values_from_example2() {
+        // Inputs hardcoded 1, this should output that 1
+        let mut output: Vec<i32> = Vec::new();
+        assert_eq!([1002, 4, 3, 4, 99], *execute_program(vec![1002, 4, 3, 4, 33], &mut output));
+    }
+
 
     #[test]
     fn test_execute_instruction_with_position_add() {
