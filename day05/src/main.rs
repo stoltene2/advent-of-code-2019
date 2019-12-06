@@ -12,7 +12,12 @@ enum Instruction {
     Add(Address, Address),
     Multiply(Address, Address),
     Input,
-    Output,
+    Output(Address),
+    JumpIfTrue(Address, Address),
+    JumpIfFalse(Address, Address),
+    LessThan(Address, Address, Address),
+    Equals(Address, Address, Address),
+    // TODO: I think I should go back to three addresses. It's just easier
 }
 
 impl Instruction {
@@ -23,12 +28,17 @@ impl Instruction {
         let intcode = digits.get(1).unwrap_or(&0)*10 + digits.get(0).unwrap();
         let param1 = int_to_address(digits.get(2).unwrap_or(&0));
         let param2 = int_to_address(digits.get(3).unwrap_or(&0));
+        let param3 = int_to_address(digits.get(4).unwrap_or(&0));
 
         match intcode {
             1 => Instruction::Add(param1, param2),
             2 => Instruction::Multiply(param1, param2),
             3 => Instruction::Input,
-            4 => Instruction::Output,
+            4 => Instruction::Output(param1),
+            5 => Instruction::JumpIfTrue(param1, param2),
+            6 => Instruction::JumpIfFalse(param1, param2),
+            7 => Instruction::LessThan(param1, param2, param3),
+            8 => Instruction::Equals(param1, param2, param3),
             99 => Instruction::Halt,
             _ => panic!("Invalid Opcode: {}", n),
         }
@@ -43,43 +53,96 @@ fn int_to_address(n: &u8) -> Address {
     }
 }
 
-fn execute_instruction(memory: &mut Vec<i32>, instruction_pointer: &usize, output: &mut Vec<i32>) -> usize {
-    let ip = *instruction_pointer;
+fn main() {
 
-    match Instruction::parse(memory[*instruction_pointer]) {
-        // Parameters that an instruction writes to will never be in immediate mode.
-        Instruction::Add(a1, a2) => {
-            let param1 = mem_lookup(memory, &a1, &(ip + 1));
-            let param2 = mem_lookup(memory, &a2, &(ip + 2));
-            let result_addr: usize = memory[ip + 3].try_into().unwrap();
+    let mut output_pt1: Vec<i32> = Vec::new();
+    execute_program(computer_memory(), 1, &mut output_pt1);
+    println!("Part 1 - {:?}", output_pt1);
 
-            memory[result_addr] = param1 + param2;
-            4
-        },
-        Instruction::Multiply(a1, a2) => {
-            let param1 = mem_lookup(memory, &a1, &(ip + 1));
-            let param2 = mem_lookup(memory, &a2, &(ip + 2));
-            let result_addr: usize = memory[ip + 3].try_into().unwrap();
+    let mut output_pt2: Vec<i32> = Vec::new();
+    execute_program(computer_memory(), 5, &mut output_pt2);
+    println!("Part 2 - {:?}", output_pt2);
 
-            memory[result_addr] = param1 * param2;
-            4
-        },
-        Instruction::Input => {
-            let input = 1;
-            let result_addr: usize = memory[ip + 1].try_into().unwrap();
-            memory[result_addr] = input;
-            2
-        },
-        Instruction::Output => {
-            let code = mem_lookup(memory, &Address::Position, &(ip + 1));
-            output.push(code);
-            2
-        },
-        Instruction::Halt => {
-            0
-        },
-    }
+
 }
+
+fn execute_program(mut memory: Vec<i32>, input: i32, output: &mut Vec<i32>) -> Vec<i32> {
+    let mut ip: usize = 0;
+
+    let mut i = 0;
+    loop {
+        i+= 1;
+        match Instruction::parse(memory[ip]) {
+            // Parameters that an instruction writes to will never be in immediate mode.
+            Instruction::Add(a1, a2) => {
+                let param1 = mem_lookup(&memory, &a1, &(ip + 1));
+                let param2 = mem_lookup(&memory, &a2, &(ip + 2));
+                let result_addr: usize = memory[ip + 3].try_into().unwrap();
+
+                memory[result_addr] = param1 + param2;
+                ip += 4
+            },
+            Instruction::Multiply(a1, a2) => {
+                let param1 = mem_lookup(&memory, &a1, &(ip + 1));
+                let param2 = mem_lookup(&memory, &a2, &(ip + 2));
+                let result_addr: usize = memory[ip + 3].try_into().unwrap();
+
+                memory[result_addr] = param1 * param2;
+                ip += 4
+            },
+            Instruction::Input => {
+                let result_addr: usize = memory[ip + 1].try_into().unwrap();
+                memory[result_addr] = input;
+                ip += 2
+            },
+            Instruction::Output(a) => {
+                let code = mem_lookup(&memory, &a, &(ip + 1));
+                output.push(code);
+                ip += 2
+            },
+            Instruction::JumpIfTrue(a1, a2) => {
+                let param1 = mem_lookup(&memory, &a1, &(ip + 1));
+                if param1 != 0 {
+                    ip = mem_lookup(&memory, &a2, &(ip + 2)).try_into().unwrap();
+                } else {
+                    ip += 3
+                }
+            },
+            Instruction::JumpIfFalse(a1, a2) => {
+                let param1 = mem_lookup(&memory, &a1, &(ip + 1));
+                if param1 == 0 {
+                    ip = mem_lookup(&memory, &a2, &(ip + 2)).try_into().unwrap();
+                } else {
+                    ip += 3
+                }
+            },
+            Instruction::LessThan(a1, a2, a3) => {
+                let param1 = mem_lookup(&memory, &a1, &(ip + 1));
+                let param2 = mem_lookup(&memory, &a2, &(ip + 2));
+                // Tests fail if we use positional values here and computer spins forever...
+                let result_addr: usize = mem_lookup(&memory, &Address::Immediate, &(ip + 3)).try_into().unwrap();
+
+                memory[result_addr] = if param1 < param2 { 1 } else { 0 };
+                ip += 4
+            },
+            Instruction::Equals(a1, a2, a3) => {
+                let param1 = mem_lookup(&memory, &a1, &(ip + 1));
+                let param2 = mem_lookup(&memory, &a2, &(ip + 2));
+                let result_addr: usize = mem_lookup(&memory, &Address::Immediate, &(ip + 3)).try_into().unwrap();
+
+                memory[result_addr] = if param1 == param2 { 1 } else { 0 };
+                ip += 4
+            },
+            Instruction::Halt => {
+                break;
+            },
+        }
+
+    }
+
+    memory
+}
+
 
 fn mem_lookup(memory: &Vec<i32>, addr_type: &Address, instruction_pointer: &usize) -> i32 {
     match addr_type {
@@ -91,21 +154,6 @@ fn mem_lookup(memory: &Vec<i32>, addr_type: &Address, instruction_pointer: &usiz
     }
 }
 
-fn main() {
-    let mut output: Vec<i32> = Vec::new();
-    execute_program(computer_memory(), &mut output);
-    println!("{:?}", output);
-}
-
-fn execute_program(mut memory: Vec<i32>, output: &mut Vec<i32>) -> Vec<i32> {
-    let mut instruction_pointer: usize = 0;
-
-    while instruction_pointer < memory.len() && Instruction::parse(memory[instruction_pointer]) != Instruction::Halt {
-        instruction_pointer += execute_instruction(&mut memory, &instruction_pointer, output);
-    }
-
-    memory
-}
 
 fn num_to_digits_rev(n: i32) -> Vec<u8> {
     let mut ds: Vec<u8> = Vec::new();
@@ -167,14 +215,6 @@ mod tests {
     use std::convert::TryInto;
 
     #[test]
-    fn test_vec_of_usize() {
-        let mut v: Vec<usize> = vec![1, 2, 3];
-        let p = v[0];
-        v[1 + p] = 0;
-        assert_eq!(v, vec![1, 2, 0]);
-    }
-
-    #[test]
     fn test_instruction_parse() {
         assert_eq!(
             Instruction::parse(1),
@@ -209,13 +249,13 @@ mod tests {
     #[test]
     fn test_addition_instruction() {
         let mut output: Vec<i32> = Vec::new();
-        assert_eq!(vec![2, 0, 0, 0, 99], execute_program(vec![1, 0, 0, 0, 99], &mut output));
-        assert_eq!(vec![99], execute_program(vec![99], &mut output));
-        assert_eq!(vec![99, 1, 0, 0, 0], execute_program(vec![99, 1, 0, 0, 0], &mut output));
-        assert_eq!(vec![2, 3, 0, 6, 99], execute_program(vec![2, 3, 0, 3, 99], &mut output));
+        assert_eq!(vec![2, 0, 0, 0, 99], execute_program(vec![1, 0, 0, 0, 99], 1, &mut output));
+        assert_eq!(vec![99], execute_program(vec![99], 1, &mut output));
+        assert_eq!(vec![99, 1, 0, 0, 0], execute_program(vec![99, 1, 0, 0, 0], 1, &mut output));
+        assert_eq!(vec![2, 3, 0, 6, 99], execute_program(vec![2, 3, 0, 3, 99], 1, &mut output));
         assert_eq!(
             vec![30, 1, 1, 4, 2, 5, 6, 0, 99],
-            execute_program(vec![1, 1, 1, 4, 99, 5, 6, 0, 99], &mut output)
+            execute_program(vec![1, 1, 1, 4, 99, 5, 6, 0, 99], 1, &mut output)
         );
     }
 
@@ -223,7 +263,7 @@ mod tests {
     fn test_execute_program_with_immediate_values() {
         // Inputs hardcoded 1, this should output that 1
         let mut output: Vec<i32> = Vec::new();
-        assert_eq!([1, 0, 4, 0, 99], *execute_program(vec![3, 0, 4, 0, 99], &mut output));
+        assert_eq!([1, 0, 4, 0, 99], *execute_program(vec![3, 0, 4, 0, 99], 1, &mut output));
         assert_eq!(1, *output.get(0).unwrap());
     }
 
@@ -231,81 +271,121 @@ mod tests {
     fn test_execute_program_with_immediate_values_from_example1() {
         // Inputs hardcoded 1, this should output that 1
         let mut output: Vec<i32> = Vec::new();
-        assert_eq!([1101, 100, -1, 4, 99], *execute_program(vec![1101, 100, -1, 4, 0], &mut output));
+        assert_eq!([1101, 100, -1, 4, 99], *execute_program(vec![1101, 100, -1, 4, 0], 1, &mut output));
     }
 
     #[test]
     fn test_execute_program_with_immediate_values_from_example2() {
         // Inputs hardcoded 1, this should output that 1
         let mut output: Vec<i32> = Vec::new();
-        assert_eq!([1002, 4, 3, 4, 99], *execute_program(vec![1002, 4, 3, 4, 33], &mut output));
+        assert_eq!([1002, 4, 3, 4, 99], *execute_program(vec![1002, 4, 3, 4, 33], 1, &mut output));
+    }
+
+    #[test]
+    fn test_execute_program_position_input_is_8() {
+        // Inputs hardcoded 1, this should output that 1
+        let mut output: Vec<i32> = Vec::new();
+        execute_program(vec![3,9,8,9,10,9,4,9,99,-1,8], 8, &mut output);
+        assert_eq!(1, output[0]);
+    }
+
+    #[test]
+    fn test_execute_program_position_input_is_not_8() {
+        // Inputs hardcoded 1, this should output that 1
+        let mut output: Vec<i32> = Vec::new();
+        execute_program(vec![3,9,8,9,10,9,4,9,99,-1,8], 9, &mut output);
+        assert_eq!(0, output[0]);
+    }
+
+    #[test]
+    fn test_execute_program_position_input_is_less_than_8() {
+        // Inputs hardcoded 1, this should output that 1
+        let mut output: Vec<i32> = Vec::new();
+        execute_program(vec![3,9,7,9,10,9,4,9,99,-1,8], 7, &mut output);
+        assert_eq!(1, output[0]);
+    }
+
+    #[test]
+    fn test_execute_program_position_input_is_greater_than_8() {
+        // Inputs hardcoded 1, this should output that 1
+        let mut output: Vec<i32> = Vec::new();
+        execute_program(vec![3,9,7,9,10,9,4,9,99,-1,8], 9, &mut output);
+        assert_eq!(0, output[0]);
+    }
+
+    #[test]
+    fn test_execute_program_immediate_input_is_equal_8() {
+        // Inputs hardcoded 1, this should output that 1
+        let mut output: Vec<i32> = Vec::new();
+        execute_program(vec![3,3,1108,-1,8,3,4,3,99], 8, &mut output);
+        assert_eq!(1, output[0]);
+    }
+
+    #[test]
+    fn test_execute_program_immediate_input_is_not_equal_8() {
+        // Inputs hardcoded 1, this should output that 1
+        let mut output: Vec<i32> = Vec::new();
+        execute_program(vec![3,3,1108,-1,8,3,4,3,99], 9, &mut output);
+        assert_eq!(0, output[0]);
+    }
+
+    #[test]
+    fn test_execute_program_immediate_input_is_less_than_8() {
+        // Inputs hardcoded 1, this should output that 1
+        let mut output: Vec<i32> = Vec::new();
+        execute_program(vec![3,3,1107,-1,8,3,4,3,99], 7, &mut output);
+        assert_eq!(1, output[0]);
+    }
+
+    #[test]
+    fn test_execute_program_immediate_input_is_greater_than_8() {
+        // Inputs hardcoded 1, this should output that 1
+        let mut output: Vec<i32> = Vec::new();
+        execute_program(vec![3,3,1107,-1,8,3,4,3,99], 9, &mut output);
+        assert_eq!(0, output[0]);
     }
 
 
     #[test]
-    fn test_execute_instruction_with_position_add() {
-        let mut mem: Vec<i32> = vec![1, 0, 0, 0, 99];
-        let mut output = Vec::new();
-
-        let ip = execute_instruction(&mut mem, &0, &mut output);
-
-        assert_eq!(ip, 4);
-        assert_eq!(mem, vec![2, 0, 0, 0, 99]);
+    fn test_execute_program_position_jump_test_input_nonzero() {
+        let mut output: Vec<i32> = Vec::new();
+        execute_program(vec![3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9], 9, &mut output);
+        assert_eq!(1, output[0]);
     }
 
     #[test]
-    fn test_execute_instruction_with_immediate_add() {
-        let mut mem: Vec<i32> = vec![101, 2, 0, 0, 99];
-        let mut output = Vec::new();
-
-        let ip = execute_instruction(&mut mem, &0, &mut output);
-
-        assert_eq!(ip, 4);
-        assert_eq!(mem, vec![103, 2, 0, 0, 99]);
+    fn test_execute_program_position_jump_test_input_zero() {
+        let mut output: Vec<i32> = Vec::new();
+        execute_program(vec![3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9], 0, &mut output);
+        assert_eq!(0, output[0]);
     }
 
     #[test]
-    fn test_execute_instruction_with_position_multiply() {
-        let mut mem: Vec<i32> = vec![2, 0, 0, 0, 99];
-        let mut output = Vec::new();
-
-        let ip = execute_instruction(&mut mem, &0, &mut output);
-
-        assert_eq!(ip, 4);
-        assert_eq!(mem, vec![4, 0, 0, 0, 99]);
+    fn test_execute_program_largest_example_less_than_8() {
+        let mut output: Vec<i32> = Vec::new();
+        execute_program(vec![3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
+                             1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
+                             999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99], 5, &mut output);
+        assert_eq!(999, output[0]);
     }
 
     #[test]
-    fn test_execute_instruction_with_immediate_multiply() {
-        let mut mem: Vec<i32> = vec![102, 2, 0, 0, 99];
-        let mut output = Vec::new();
-
-        let ip = execute_instruction(&mut mem, &0, &mut output);
-
-        assert_eq!(ip, 4);
-        assert_eq!(mem, vec![204, 2, 0, 0, 99]);
+    fn test_execute_program_largest_example_equal_8() {
+        let mut output: Vec<i32> = Vec::new();
+        execute_program(vec![3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
+                             1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
+                             999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99], 8, &mut output);
+        assert_eq!(1000, output[0]);
     }
+
 
     #[test]
-    fn test_read_input() {
-        let mut mem: Vec<i32> = vec![3, 0, 0, 0, 99];
-        let mut output = Vec::new();
-
-        let ip = execute_instruction(&mut mem, &0, &mut output);
-
-        assert_eq!(ip, 2);
-        assert_eq!(mem, vec![1, 0, 0, 0, 99]);
+    fn test_execute_program_largest_example_more_than_8() {
+        let mut output: Vec<i32> = Vec::new();
+        execute_program(vec![3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
+                             1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
+                             999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99], 10, &mut output);
+        assert_eq!(1001, output[0]);
     }
 
-    #[test]
-    fn test_output() {
-        let mut mem: Vec<i32> = vec![4, 2, 3, 0, 99];
-        let mut output = Vec::new();
-
-        let ip = execute_instruction(&mut mem, &0, &mut output);
-
-        assert_eq!(ip, 2);
-        assert_eq!(mem, vec![4, 2, 3, 0, 99]);
-        assert_eq!(output, vec![3]);
-    }
 }
