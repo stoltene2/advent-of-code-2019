@@ -12,7 +12,7 @@ enum Instruction {
     Add(Address, Address, Address),
     Multiply(Address, Address, Address),
     Read(Address),
-    Write(Address),
+    Output(Address),
 }
 
 impl Instruction {
@@ -29,7 +29,7 @@ impl Instruction {
             1 => Instruction::Add(param1, param2, param3),
             2 => Instruction::Multiply(param1, param2, param3),
             3 => Instruction::Read(param1),
-            4 => Instruction::Write(param1),
+            4 => Instruction::Output(param1),
             99 => Instruction::Halt,
             _ => panic!("Invalid Opcode: {}", n),
         }
@@ -44,12 +44,7 @@ fn int_to_address(n: &u8) -> Address {
     }
 }
 
-fn execute_instruction(memory: &mut Vec<i32>, instruction_pointer: &usize) -> usize {
-    // Take instruction
-    // Lookup values from memory
-    // return new instruction_pointer offset
-    // Reading just reads a constant for now
-
+fn execute_instruction(memory: &mut Vec<i32>, instruction_pointer: &usize, output: &mut Vec<i32>) -> usize {
     let ip = *instruction_pointer;
 
     match Instruction::parse(memory[*instruction_pointer]) {
@@ -60,8 +55,6 @@ fn execute_instruction(memory: &mut Vec<i32>, instruction_pointer: &usize) -> us
             let result_addr: usize = memory[ip + 3].try_into().unwrap();
 
             memory[result_addr] = param1 + param2;
-            // println!("addr_types, {:?} {:?} {:?}", &a1, &a2, &a3);
-            // println!("val1={}, val2={}, result_addr={}, memory: {:?}", param1, param2, result_addr, memory);
             *instruction_pointer + 4
         },
         Instruction::Multiply(a1, a2, a3) => {
@@ -70,20 +63,22 @@ fn execute_instruction(memory: &mut Vec<i32>, instruction_pointer: &usize) -> us
             let result_addr: usize = memory[ip + 3].try_into().unwrap();
 
             memory[result_addr] = param1 * param2;
-            // println!("addr_types, {:?} {:?} {:?}", &a1, &a2, &a3);
-            // println!("val1={}, val2={}, result_addr={}, memory: {:?}", param1, param2, result_addr, memory);
             *instruction_pointer + 4
         },
         Instruction::Read(a) => {
+            let input = 1;
+            let result_addr: usize = memory[ip + 1].try_into().unwrap();
+            memory[result_addr] = input;
             *instruction_pointer + 2
         },
-        Instruction::Write(a) => {
+        Instruction::Output(a) => {
+            output.push(mem_lookup(memory, &Address::Position, &(ip + 1)));
             *instruction_pointer + 2
         },
         Instruction::Halt => {
-            0
+            ip
         },
-        _ => panic!("Coming soon ")
+        _ => panic!("Unknow instruction")
     }
 }
 
@@ -216,7 +211,7 @@ mod tests {
             Instruction::Multiply(Address::Position, Address::Position, Address::Position)
         );
         assert_eq!(Instruction::parse(3), Instruction::Read(Address::Position));
-        assert_eq!(Instruction::parse(4), Instruction::Write(Address::Position));
+        assert_eq!(Instruction::parse(4), Instruction::Output(Address::Position));
         assert_eq!(Instruction::parse(99), Instruction::Halt);
 
         assert_eq!(
@@ -235,7 +230,7 @@ mod tests {
         );
 
         assert_eq!(Instruction::parse(103), Instruction::Read(Address::Immediate));
-        assert_eq!(Instruction::parse(104), Instruction::Write(Address::Immediate));
+        assert_eq!(Instruction::parse(104), Instruction::Output(Address::Immediate));
 
     }
 
@@ -254,7 +249,10 @@ mod tests {
     #[test]
     fn test_execute_instruction_with_position_add() {
         let mut mem: Vec<i32> = vec![1, 0, 0, 0, 99];
-        let ip = execute_instruction(&mut mem, &0);
+        let mut output = Vec::new();
+
+        let ip = execute_instruction(&mut mem, &0, &mut output);
+
         assert_eq!(ip, 4);
         assert_eq!(mem, vec![2, 0, 0, 0, 99]);
     }
@@ -262,7 +260,10 @@ mod tests {
     #[test]
     fn test_execute_instruction_with_immediate_add() {
         let mut mem: Vec<i32> = vec![101, 2, 0, 0, 99];
-        let ip = execute_instruction(&mut mem, &0);
+        let mut output = Vec::new();
+
+        let ip = execute_instruction(&mut mem, &0, &mut output);
+
         assert_eq!(ip, 4);
         assert_eq!(mem, vec![103, 2, 0, 0, 99]);
     }
@@ -270,7 +271,10 @@ mod tests {
     #[test]
     fn test_execute_instruction_with_position_multiply() {
         let mut mem: Vec<i32> = vec![2, 0, 0, 0, 99];
-        let ip = execute_instruction(&mut mem, &0);
+        let mut output = Vec::new();
+
+        let ip = execute_instruction(&mut mem, &0, &mut output);
+
         assert_eq!(ip, 4);
         assert_eq!(mem, vec![4, 0, 0, 0, 99]);
     }
@@ -278,9 +282,35 @@ mod tests {
     #[test]
     fn test_execute_instruction_with_immediate_multiply() {
         let mut mem: Vec<i32> = vec![102, 2, 0, 0, 99];
-        let ip = execute_instruction(&mut mem, &0);
+        let mut output = Vec::new();
+
+        let ip = execute_instruction(&mut mem, &0, &mut output);
+
         assert_eq!(ip, 4);
         assert_eq!(mem, vec![204, 2, 0, 0, 99]);
+    }
+
+    #[test]
+    fn test_read_input() {
+        let mut mem: Vec<i32> = vec![3, 0, 0, 0, 99];
+        let mut output = Vec::new();
+
+        let ip = execute_instruction(&mut mem, &0, &mut output);
+
+        assert_eq!(ip, 2);
+        assert_eq!(mem, vec![1, 0, 0, 0, 99]);
+    }
+
+    #[test]
+    fn test_output() {
+        let mut mem: Vec<i32> = vec![4, 2, 3, 0, 99];
+        let mut output = Vec::new();
+
+        let ip = execute_instruction(&mut mem, &0, &mut output);
+
+        assert_eq!(ip, 2);
+        assert_eq!(mem, vec![4, 2, 3, 0, 99]);
+        assert_eq!(output, vec![3]);
     }
 
     #[test]
