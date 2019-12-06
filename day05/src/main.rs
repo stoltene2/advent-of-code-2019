@@ -1,7 +1,109 @@
 use std::convert::TryInto;
 
+#[derive(Debug, Eq, PartialEq)]
+enum Address {
+    Immediate,
+    Position,
+}
+
+#[derive(Debug, PartialEq)]
+enum Instruction {
+    Halt,
+    Add(Address, Address, Address),
+    Multiply(Address, Address, Address),
+    Read(Address),
+    Write(Address),
+}
+
+impl Instruction {
+    fn parse(n: i32) -> Instruction {
+
+        let digits = num_to_digits_rev(n);
+
+        let intcode = digits.get(1).unwrap_or(&0)*10 + digits.get(0).unwrap();
+        let param1 = int_to_address(digits.get(2).unwrap_or(&0));
+        let param2 = int_to_address(digits.get(3).unwrap_or(&0));
+        let param3 = int_to_address(digits.get(4).unwrap_or(&0));
+
+        match intcode {
+            1 => Instruction::Add(param1, param2, param3),
+            2 => Instruction::Multiply(param1, param2, param3),
+            3 => Instruction::Read(param1),
+            4 => Instruction::Write(param1),
+            99 => Instruction::Halt,
+            _ => panic!("Invalid Opcode: {}", n),
+        }
+    }
+}
+
+fn int_to_address(n: &u8) -> Address {
+    if *n == 1_u8 {
+        Address::Immediate
+    } else {
+        Address::Position
+    }
+}
+
+fn execute_instruction(memory: &mut Vec<i32>, instruction_pointer: &usize) -> usize {
+    // Take instruction
+    // Lookup values from memory
+    // return new instruction_pointer offset
+    // Reading just reads a constant for now
+
+    let ip = *instruction_pointer;
+
+    match Instruction::parse(memory[*instruction_pointer]) {
+        // Parameters that an instruction writes to will never be in immediate mode.
+        Instruction::Add(a1, a2, a3) => {
+            let param1 = mem_lookup(memory, &a1, &(ip + 1));
+            let param2 = mem_lookup(memory, &a2, &(ip + 2));
+            let result_addr: usize = memory[ip + 3].try_into().unwrap();
+
+            memory[result_addr] = param1 + param2;
+            // println!("addr_types, {:?} {:?} {:?}", &a1, &a2, &a3);
+            // println!("val1={}, val2={}, result_addr={}, memory: {:?}", param1, param2, result_addr, memory);
+            *instruction_pointer + 4
+        },
+        Instruction::Multiply(a1, a2, a3) => {
+            let param1 = mem_lookup(memory, &a1, &(ip + 1));
+            let param2 = mem_lookup(memory, &a2, &(ip + 2));
+            let result_addr: usize = memory[ip + 3].try_into().unwrap();
+
+            memory[result_addr] = param1 * param2;
+            // println!("addr_types, {:?} {:?} {:?}", &a1, &a2, &a3);
+            // println!("val1={}, val2={}, result_addr={}, memory: {:?}", param1, param2, result_addr, memory);
+            *instruction_pointer + 4
+        },
+        Instruction::Read(a) => {
+            *instruction_pointer + 2
+        },
+        Instruction::Write(a) => {
+            *instruction_pointer + 2
+        },
+        Instruction::Halt => {
+            0
+        },
+        _ => panic!("Coming soon ")
+    }
+}
+
+fn mem_lookup(memory: &Vec<i32>, addr_type: &Address, instruction_pointer: &usize) -> i32 {
+    match addr_type {
+        Address::Immediate => memory[*instruction_pointer],
+        Address::Position  => {
+            let ref_address: usize = memory[*instruction_pointer].try_into().unwrap();
+            memory[ref_address]
+        }
+    }
+}
+
 fn main() {
-    println!("TODO: Diagnostic Code: {:?}", 0);
+    println!("TODO: Diagnostic Code: {:?}", Instruction::parse(1));
+    println!("TODO: Diagnostic Code: {:?}", Instruction::parse(2));
+    println!("TODO: Diagnostic Code: {:?}", Instruction::parse(3));
+    println!("TODO: Diagnostic Code: {:?}", Instruction::parse(4));
+    println!("TODO: Diagnostic Code: {:?}", Instruction::parse(99));
+    println!("TODO: Diagnostic Code: {:?}", Instruction::parse(22));
 }
 
 fn execute_program(mut memory: Vec<i32>) -> Vec<i32> {
@@ -33,6 +135,19 @@ fn execute_program(mut memory: Vec<i32>) -> Vec<i32> {
     }
 
     memory
+}
+
+fn num_to_digits_rev(n: i32) -> Vec<u8> {
+    let mut ds: Vec<u8> = Vec::new();
+    let mut res = n;
+
+    while res > 0 {
+        let digit = res % 10;
+        ds.push(digit.try_into().unwrap());
+        res = (res - digit) / 10;
+    }
+
+    ds
 }
 
 fn computer_memory() -> Vec<i32> {
@@ -90,6 +205,41 @@ mod tests {
     }
 
     #[test]
+    fn test_instruction_parse() {
+        assert_eq!(
+            Instruction::parse(1),
+            Instruction::Add(Address::Position, Address::Position, Address::Position)
+        );
+
+        assert_eq!(
+            Instruction::parse(2),
+            Instruction::Multiply(Address::Position, Address::Position, Address::Position)
+        );
+        assert_eq!(Instruction::parse(3), Instruction::Read(Address::Position));
+        assert_eq!(Instruction::parse(4), Instruction::Write(Address::Position));
+        assert_eq!(Instruction::parse(99), Instruction::Halt);
+
+        assert_eq!(
+            Instruction::parse(11101),
+            Instruction::Add(Address::Immediate, Address::Immediate, Address::Immediate)
+        );
+
+        assert_eq!(
+            Instruction::parse(1101),
+            Instruction::Add(Address::Immediate, Address::Immediate, Address::Position)
+        );
+
+        assert_eq!(
+            Instruction::parse(11102),
+            Instruction::Multiply(Address::Immediate, Address::Immediate, Address::Immediate)
+        );
+
+        assert_eq!(Instruction::parse(103), Instruction::Read(Address::Immediate));
+        assert_eq!(Instruction::parse(104), Instruction::Write(Address::Immediate));
+
+    }
+
+    #[test]
     fn test_addition_instruction() {
         assert_eq!(vec![2, 0, 0, 0, 99], execute_program(vec![1, 0, 0, 0, 99]));
         assert_eq!(vec![99], execute_program(vec![99]));
@@ -99,6 +249,38 @@ mod tests {
             vec![30, 1, 1, 4, 2, 5, 6, 0, 99],
             execute_program(vec![1, 1, 1, 4, 99, 5, 6, 0, 99])
         );
+    }
+
+    #[test]
+    fn test_execute_instruction_with_position_add() {
+        let mut mem: Vec<i32> = vec![1, 0, 0, 0, 99];
+        let ip = execute_instruction(&mut mem, &0);
+        assert_eq!(ip, 4);
+        assert_eq!(mem, vec![2, 0, 0, 0, 99]);
+    }
+
+    #[test]
+    fn test_execute_instruction_with_immediate_add() {
+        let mut mem: Vec<i32> = vec![101, 2, 0, 0, 99];
+        let ip = execute_instruction(&mut mem, &0);
+        assert_eq!(ip, 4);
+        assert_eq!(mem, vec![103, 2, 0, 0, 99]);
+    }
+
+    #[test]
+    fn test_execute_instruction_with_position_multiply() {
+        let mut mem: Vec<i32> = vec![2, 0, 0, 0, 99];
+        let ip = execute_instruction(&mut mem, &0);
+        assert_eq!(ip, 4);
+        assert_eq!(mem, vec![4, 0, 0, 0, 99]);
+    }
+
+    #[test]
+    fn test_execute_instruction_with_immediate_multiply() {
+        let mut mem: Vec<i32> = vec![102, 2, 0, 0, 99];
+        let ip = execute_instruction(&mut mem, &0);
+        assert_eq!(ip, 4);
+        assert_eq!(mem, vec![204, 2, 0, 0, 99]);
     }
 
     #[test]
