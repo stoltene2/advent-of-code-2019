@@ -97,28 +97,17 @@ fn mem_lookup(memory: &Vec<i32>, addr_type: &Address, instruction_pointer: &usiz
 }
 
 fn main() {
-    println!("TODO: Diagnostic Code: {:?}", Instruction::parse(1));
-    println!("TODO: Diagnostic Code: {:?}", Instruction::parse(2));
-    println!("TODO: Diagnostic Code: {:?}", Instruction::parse(3));
-    println!("TODO: Diagnostic Code: {:?}", Instruction::parse(4));
-    println!("TODO: Diagnostic Code: {:?}", Instruction::parse(99));
-    println!("TODO: Diagnostic Code: {:?}", Instruction::parse(22));
+
 }
 
-fn execute_program(mut memory: Vec<i32>) -> Vec<i32> {
-    let mut output: Vec<i32> = Vec::new();
+fn execute_program(mut memory: Vec<i32>, output: &mut Vec<i32>) -> Vec<i32> {
     let mut instruction_pointer: usize = 0;
 
-    println!("starting, memory: {}", memory.len());
-    let mut i = 10;
-    while instruction_pointer < memory.len() || i < 10 {
-        println!("ip: {}", instruction_pointer);
-        i += 1;
-        instruction_pointer += execute_instruction(&mut memory, &instruction_pointer, &mut output);
-   }
+    while instruction_pointer < memory.len() && Instruction::parse(memory[instruction_pointer]) != Instruction::Halt {
+        instruction_pointer += execute_instruction(&mut memory, &instruction_pointer, output);
+    }
 
-    println!("ip: {}", instruction_pointer);
-    output
+    memory
 }
 
 fn num_to_digits_rev(n: i32) -> Vec<u8> {
@@ -220,22 +209,32 @@ mod tests {
 
     }
 
-    // #[test]
-    // fn test_addition_instruction() {
-    //     assert_eq!(vec![2, 0, 0, 0, 99], execute_program(vec![1, 0, 0, 0, 99]));
-    //     assert_eq!(vec![99], execute_program(vec![99]));
-    //     assert_eq!(vec![99, 1, 0, 0, 0], execute_program(vec![99, 1, 0, 0, 0]));
-    //     assert_eq!(vec![2, 3, 0, 6, 99], execute_program(vec![2, 3, 0, 3, 99]));
-    //     assert_eq!(
-    //         vec![30, 1, 1, 4, 2, 5, 6, 0, 99],
-    //         execute_program(vec![1, 1, 1, 4, 99, 5, 6, 0, 99])
-    //     );
-    // }
+    #[test]
+    fn test_addition_instruction() {
+        let mut output: Vec<i32> = Vec::new();
+        assert_eq!(vec![2, 0, 0, 0, 99], execute_program(vec![1, 0, 0, 0, 99], &mut output));
+        assert_eq!(vec![99], execute_program(vec![99], &mut output));
+        assert_eq!(vec![99, 1, 0, 0, 0], execute_program(vec![99, 1, 0, 0, 0], &mut output));
+        assert_eq!(vec![2, 3, 0, 6, 99], execute_program(vec![2, 3, 0, 3, 99], &mut output));
+        assert_eq!(
+            vec![30, 1, 1, 4, 2, 5, 6, 0, 99],
+            execute_program(vec![1, 1, 1, 4, 99, 5, 6, 0, 99], &mut output)
+        );
+    }
 
     #[test]
-    fn test_execute_program_with_immediate_values_99() {
+    fn test_execute_program_with_immediate_values() {
         // Inputs hardcoded 1, this should output that 1
-        assert_eq!(1, *execute_program(vec![3, 0, 4, 0, 99]).get(0).unwrap());
+        let mut output: Vec<i32> = Vec::new();
+        assert_eq!([1, 0, 4, 0, 99], *execute_program(vec![3, 0, 4, 0, 99], &mut output));
+        assert_eq!(1, *output.get(0).unwrap());
+    }
+
+    #[test]
+    fn test_execute_program_with_immediate_values_from_example() {
+        // Inputs hardcoded 1, this should output that 1
+        let mut output: Vec<i32> = Vec::new();
+        assert_eq!([1101, 100, -1, 4, 99], *execute_program(vec![1101, 100, -1, 4, 0], &mut output));
     }
 
     #[test]
