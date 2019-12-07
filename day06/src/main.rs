@@ -67,6 +67,46 @@ fn count_all_orbits(orbit_map: Vec<&str>) -> u32 {
     traverse_tree_of_orbits(&objects, "COM", 0, &mut 0)
 }
 
+fn count_transfers_needed_to_match_orbit(orbit_map: Vec<&str>, from: &str, to: &str) -> u32 {
+
+    let mut objects: HashMap<&str, Orbit> = HashMap::new();
+
+    for orbit in orbit_map {
+        let (around_name, object_name) = parse_orbit(orbit);
+
+        create_orbit(&mut objects, object_name, around_name);
+    }
+
+    // Don't forget I might need to subtract off endpoints
+    find_minimal_path(&objects, from, to)
+}
+
+// TODO: when visiting children, don't check a from_node
+fn find_minimal_path(orbits: &HashMap<&str, Orbit>, from_node: &str, to_node: &str) -> u32 {
+
+    let me: &Orbit = orbits.get(from_node).unwrap();
+
+    if let Some(parent_name) = &me.orbiting {
+        // Check if from_node and to_node are already visiting the same node
+        let parent = orbits.get(parent_name).unwrap();
+
+        if parent.orbiting_self.iter().find(|&&x| x == to_node).is_some() {
+            return 0;
+        }
+    }
+
+
+    // if santa is my parent then I'm 1 away - recursive call
+    // setting distance to 1
+    // changing from node to my parent
+
+    // if santa is a child I am 1 away
+    // Check children
+
+    100000
+
+}
+
 fn traverse_tree_of_orbits(orbits: &HashMap<&str, Orbit>, from_node: &str, indirect_orbits: u32, total: &mut u32) -> u32 {
     *total += indirect_orbits;
     let root = orbits.get(from_node).unwrap();
@@ -111,7 +151,7 @@ mod tests {
         assert_eq!(42, count_all_orbits(orbit_map));
     }
 
-        #[test]
+    #[test]
     fn test_example_1_com_appearing_last() {
         let orbit_map = vec![
             "B)C",
@@ -166,6 +206,40 @@ mod tests {
 
         assert_eq!(7, count_all_orbits(orbit_map));
     }
+
+    #[test]
+    fn test_count_transfers_needed_to_match_orbit_when_it_is_0() {
+        let orbit_map = vec![
+            "COM)YOU",
+            "COM)SAN",
+        ];
+
+        assert_eq!(0, count_transfers_needed_to_match_orbit(orbit_map, "YOU", "SAN"));
+    }
+
+    #[test]
+    fn test_count_transfers_needed_to_match_orbit_when_it_is_1() {
+        let orbit_map = vec![
+            "COM)A",
+            "A)B",
+            "A)YOU",
+            "B)SAN",
+        ];
+
+        assert_eq!(1, count_transfers_needed_to_match_orbit(orbit_map, "YOU", "SAN"));
+    }
+
+    fn test_count_transfers_needed_to_match_orbit_when_it_is_1_reversed() {
+        let orbit_map = vec![
+            "COM)A",
+            "A)B",
+            "A)SAN",
+            "B)YOU",
+        ];
+
+        assert_eq!(1, count_transfers_needed_to_match_orbit(orbit_map, "YOU", "SAN"));
+    }
+
 }
 
 fn input_orbits() -> Vec<&'static str> {
