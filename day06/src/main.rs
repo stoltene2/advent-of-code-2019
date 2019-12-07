@@ -21,21 +21,26 @@ struct Orbit<'a> {
 
 impl<'a> Orbit<'a> {
     fn new(orbiting: Option<&'a str>, name: &'a str) -> Orbit<'a> {
-        let orbit: Orbit<'a> = Orbit{
+        Orbit {
             name,
             orbiting,
             orbiting_self: Vec::new(),
-        };
-
-        orbit
+        }
     }
 }
 
 // The lifetime bounds here were needed. It took me a long time to discover it
 // It says that the lifetime of my new key needs to live longer than my parent and longer than the keys in the hash map
 fn create_orbit<'a, 'b>(orbits: &mut HashMap<&'a str, Orbit<'a>>, name: &'b str, around: &'a str) where 'b: 'a {
+    let new_orbit: Orbit = if let Some(new_orbit_2) = orbits.get(name) {
+        // Scenario when FOO)BAR exists in orbital map but ZAP)FOO is discovered.
+        // We update FOO's orbit so that it has a parental reference to ZAP.
+        Orbit{orbiting: Some(around), name, orbiting_self: new_orbit_2.orbiting_self.clone()}
+    } else {
+        Orbit{name, orbiting: Some(around), orbiting_self: Vec::new()}
+    };
+
     let around_object = orbits.entry(around).or_insert(Orbit::new(None, around));
-    let new_orbit = Orbit{name, orbiting: Some(around), orbiting_self: Vec::new()};
 
     let updated_around = Orbit{
         orbiting_self: {
@@ -53,25 +58,24 @@ fn create_orbit<'a, 'b>(orbits: &mut HashMap<&'a str, Orbit<'a>>, name: &'b str,
 fn count_all_orbits(orbit_map: Vec<&str>) -> u32 {
     let mut objects: HashMap<&str, Orbit> = HashMap::new();
 
-    // TODO: Make a fold
     for orbit in orbit_map {
         let (around_name, object_name) = parse_orbit(orbit);
 
         create_orbit(&mut objects, object_name, around_name);
     }
 
-    traverse_tree_of_orbits(&objects, "COM", 0)
+    traverse_tree_of_orbits(&objects, "COM", 0, &mut 0)
 }
 
-fn traverse_tree_of_orbits(orbits: &HashMap<&str, Orbit>, from_node: &str, total: u32) -> u32 {
+fn traverse_tree_of_orbits(orbits: &HashMap<&str, Orbit>, from_node: &str, indirect_orbits: u32, total: &mut u32) -> u32 {
+    *total += indirect_orbits;
     let root = orbits.get(from_node).unwrap();
-    let mut new_total: u32 = total;
 
     for node in root.orbiting_self.iter() {
-        new_total += traverse_tree_of_orbits(orbits, node, total + 1);
+        traverse_tree_of_orbits(orbits, node, indirect_orbits + 1, total);
     }
 
-    new_total
+    *total
 }
 
 
@@ -81,7 +85,6 @@ fn parse_orbit(orbit: &str) -> (&str, &str) {
 }
 
 fn main() {
-    // 2242 is not the correct answer
     println!("max orbits: {}", count_all_orbits(input_orbits()));
 }
 
@@ -103,6 +106,25 @@ mod tests {
             "E)J",
             "J)K",
             "K)L",
+        ];
+
+        assert_eq!(42, count_all_orbits(orbit_map));
+    }
+
+        #[test]
+    fn test_example_1_com_appearing_last() {
+        let orbit_map = vec![
+            "B)C",
+            "C)D",
+            "D)E",
+            "E)F",
+            "B)G",
+            "G)H",
+            "D)I",
+            "E)J",
+            "J)K",
+            "K)L",
+            "COM)B",
         ];
 
         assert_eq!(42, count_all_orbits(orbit_map));
@@ -132,6 +154,18 @@ mod tests {
         assert_eq!(7, count_all_orbits(orbit_map));
     }
 
+    #[test]
+    fn test_example_3_com_appearing_last() {
+        let orbit_map = vec![
+            "A)D",
+            "B)E",
+            "COM)A",
+            "COM)B",
+            "COM)C",
+        ];
+
+        assert_eq!(7, count_all_orbits(orbit_map));
+    }
 }
 
 fn input_orbits() -> Vec<&'static str> {
