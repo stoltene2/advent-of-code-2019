@@ -64,17 +64,17 @@ fn count_0_1_2(row: Vec<&u8>) -> (u32, u32, u32) {
 // Takes input and makes a Vec of Vecs where each row is the flattened layer
 fn input_to_layer_vec(input: &Vec<u8>, row_size: usize, column_size: usize) -> Vec<u8> {
     let image_size = row_size * column_size;
-    let mut layers: Vec<_> = Vec::new();
+    let mut layers: Vec<_> = Vec::with_capacity(column_size);
 
     for layer in &input.into_iter().chunks(image_size) {
         let vec = layer.collect_vec();
         layers.push(vec);
     }
 
-    let mut output = Vec::new();
+    let mut output = Vec::with_capacity(image_size);
 
     for col in 0..image_size {
-        let mut nth_element_from_each_layer = Vec::new();
+        let mut nth_element_from_each_layer = Vec::with_capacity(layers.len());
 
         for layer_num in 0..layers.len() {
             nth_element_from_each_layer.push(*layers[layer_num][col]);
