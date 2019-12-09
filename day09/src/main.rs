@@ -1,4 +1,5 @@
 use std::convert::TryInto;
+use std::collections::HashMap;
 
 use permutohedron::heap_recursive;
 
@@ -11,27 +12,39 @@ enum Address {
 #[derive(Debug, Clone, PartialEq)]
 struct Memory {
     main: Vec<i32>,
+    ext: HashMap<usize, i32>,
 }
 
 impl Memory {
     fn new() -> Memory {
         Memory {
-            main: Vec::new()
+            main: Vec::new(),
+            ext: HashMap::new(),
         }
     }
 
     fn from(input: Vec<i32>) -> Memory {
         Memory {
-            main: input
+            main: input,
+            ext: HashMap::new(),
         }
     }
 
+    // TODO: Should have a variant for getting a usize back
     fn get(&self, address: usize) -> i32 {
-        self.main[address].try_into().unwrap()
+        if (address < self.main.len()) {
+            self.main[address].try_into().unwrap()
+        } else {
+            *self.ext.get(&address).unwrap_or(&0)
+        }
     }
 
     fn set(&mut self, address: usize, value: i32) {
-        self.main[address] = value;
+        if (address < self.main.len()) {
+            self.main[address] = value;
+        } else {
+            self.ext.insert(address, value);
+        }
     }
 
     // Like a get but uses the Address type
@@ -693,4 +706,24 @@ mod tests {
             feedback_amplifier_circuit(computer_memory())
         );
     }
+
+    #[test]
+    fn test_write_and_read_from_extended_memory() {
+        // Writes 2 to address 1000 and then reads it back
+        let mut mem = Memory::from(vec![101, 1, 1, 1000, 99]);
+
+        let output_state = execute_program(mem, Vec::new(), Vec::new(), 0).unwrap_halt();
+
+        assert_eq!(2, output_state.memory.get(1000));
+    }
+
+    #[test]
+    fn test_read_from_extended_memory_returns_0_if_not_set() {
+        let mut mem = Memory::from(vec![4, 10000, 99]);
+
+        let output_state = execute_program(mem, Vec::new(), Vec::new(), 0).unwrap_halt();
+
+        assert_eq!(0, output_state.output[0]);
+    }
+
 }
