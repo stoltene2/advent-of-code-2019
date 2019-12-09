@@ -8,6 +8,45 @@ enum Address {
     Position,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+struct Memory {
+    main: Vec<i32>,
+}
+
+impl Memory {
+    fn new() -> Memory {
+        Memory {
+            main: Vec::new()
+        }
+    }
+
+    fn from(input: Vec<i32>) -> Memory {
+        Memory {
+            main: input
+        }
+    }
+
+    fn get(&self, address: usize) -> i32 {
+        self.main[address].try_into().unwrap()
+    }
+
+    fn set(&mut self, address: usize, value: i32) {
+        self.main[address] = value;
+    }
+
+    // Like a get but uses the Address type
+    fn lookup(&self, addr_type: &Address, instruction_pointer: usize) -> i32 {
+        match addr_type {
+            Address::Immediate => self.get(instruction_pointer),
+            Address::Position => {
+                let ref_address: usize = self.get(instruction_pointer).try_into().unwrap();
+                self.get(ref_address)
+            }
+        }
+    }
+
+}
+
 #[derive(Debug, PartialEq)]
 enum Instruction {
     Halt,
@@ -21,6 +60,7 @@ enum Instruction {
     Equals(Address, Address, Address),
     // TODO: I think I should go back to three addresses. It's just easier
 }
+
 impl Instruction {
     fn parse(n: i32) -> Instruction {
         let digits = num_to_digits_rev(n);
@@ -50,15 +90,15 @@ impl Instruction {
 struct ProgState {
     output: Vec<i32>,
     input: Vec<i32>,
-    memory: Vec<i32>,
+    memory: Memory,
     instruction_pointer: usize,
 }
 
 impl ProgState {
 
-    fn new(memory: Vec<i32>, input: Vec<i32>) -> ProgState {
+    fn new(memory: Memory, input: Vec<i32>) -> ProgState {
         ProgState {
-            memory: memory,
+            memory,
             instruction_pointer: 0,
             output: Vec::new(),
             input: input,
@@ -102,6 +142,7 @@ impl ProgResult {
     }
 }
 
+// TODO: Make a helper for this in impl Address
 fn int_to_address(n: &u8) -> Address {
     if *n == 1_u8 {
         Address::Immediate
@@ -117,35 +158,37 @@ fn main() {
     println!("max feedback signal: {}", feedback_amplifier_circuit(computer_memory()));
 }
 
-fn execute_program(mut memory: Vec<i32>, input: Vec<i32>, existing_output: Vec<i32>, ip: usize) -> ProgResult {
+// Make this take ProgState
+fn execute_program(mut memory: Memory, input: Vec<i32>, existing_output: Vec<i32>, ip: usize) -> ProgResult {
     let mut ip: usize = ip.clone();
     let mut output = existing_output.clone();
     let mut input_iter: _ = input.into_iter();
 
     loop {
-        match Instruction::parse(memory[ip]) {
+        match Instruction::parse(memory.get(ip)) {
             // Parameters that an instruction writes to will never be in immediate mode.
             Instruction::Add(a1, a2) => {
-                let param1 = mem_lookup(&memory, &a1, &(ip + 1));
-                let param2 = mem_lookup(&memory, &a2, &(ip + 2));
-                let result_addr: usize = memory[ip + 3].try_into().unwrap();
+                let param1 = memory.lookup(&a1, ip + 1);
+                let param2 = memory.lookup(&a2, ip + 2);
+                let result_addr: usize = memory.get(ip + 3).try_into().unwrap();
 
-                memory[result_addr] = param1 + param2;
+                memory.set(result_addr, param1 + param2);
+
                 ip += 4
             }
             Instruction::Multiply(a1, a2) => {
-                let param1 = mem_lookup(&memory, &a1, &(ip + 1));
-                let param2 = mem_lookup(&memory, &a2, &(ip + 2));
-                let result_addr: usize = memory[ip + 3].try_into().unwrap();
+                let param1 = memory.lookup(&a1, ip + 1);
+                let param2 = memory.lookup(&a2, ip + 2);
+                let result_addr: usize = memory.get(ip + 3).try_into().unwrap();
 
-                memory[result_addr] = param1 * param2;
+                memory.set(result_addr, param1 * param2);
                 ip += 4
             }
             Instruction::Input => {
-                let result_addr: usize = memory[ip + 1].try_into().unwrap();
+                let result_addr: usize = memory.get(ip + 1).try_into().unwrap();
                 match input_iter.next() {
                     Some(result) => {
-                        memory[result_addr] = result;
+                        memory.set(result_addr, result) ;
                         ip += 2
                     },
                     None => {
@@ -160,45 +203,41 @@ fn execute_program(mut memory: Vec<i32>, input: Vec<i32>, existing_output: Vec<i
                 }
             }
             Instruction::Output(a) => {
-                let code = mem_lookup(&memory, &a, &(ip + 1));
+                let code = memory.lookup(&a, ip + 1).try_into().unwrap();
                 output.push(code);
                 ip += 2
             }
             Instruction::JumpIfTrue(a1, a2) => {
-                let param1 = mem_lookup(&memory, &a1, &(ip + 1));
+                let param1 = memory.lookup(&a1, ip + 1);
                 if param1 != 0 {
-                    ip = mem_lookup(&memory, &a2, &(ip + 2)).try_into().unwrap();
+                    ip = memory.lookup(&a2, ip + 2).try_into().unwrap();
                 } else {
                     ip += 3
                 }
             }
             Instruction::JumpIfFalse(a1, a2) => {
-                let param1 = mem_lookup(&memory, &a1, &(ip + 1));
+                let param1 = memory.lookup(&a1, ip + 1);
                 if param1 == 0 {
-                    ip = mem_lookup(&memory, &a2, &(ip + 2)).try_into().unwrap();
+                    ip = memory.lookup(&a2, ip + 2).try_into().unwrap();
                 } else {
                     ip += 3
                 }
             }
             Instruction::LessThan(a1, a2, a3) => {
-                let param1 = mem_lookup(&memory, &a1, &(ip + 1));
-                let param2 = mem_lookup(&memory, &a2, &(ip + 2));
+                let param1 = memory.lookup(&a1, ip + 1);
+                let param2 = memory.lookup(&a2, ip + 2);
                 // Tests fail if we use positional values here and computer spins forever...
-                let result_addr: usize = mem_lookup(&memory, &Address::Immediate, &(ip + 3))
-                    .try_into()
-                    .unwrap();
+                let result_addr: usize = memory.get(ip + 3).try_into().unwrap();
 
-                memory[result_addr] = if param1 < param2 { 1 } else { 0 };
+                memory.set(result_addr, if param1 < param2 { 1 } else { 0 });
                 ip += 4
             }
             Instruction::Equals(a1, a2, a3) => {
-                let param1 = mem_lookup(&memory, &a1, &(ip + 1));
-                let param2 = mem_lookup(&memory, &a2, &(ip + 2));
-                let result_addr: usize = mem_lookup(&memory, &Address::Immediate, &(ip + 3))
-                    .try_into()
-                    .unwrap();
+                let param1 = memory.lookup(&a1, ip + 1);
+                let param2 = memory.lookup(&a2, ip + 2);
+                let result_addr: usize = memory.get(ip + 3).try_into().unwrap();
 
-                memory[result_addr] = if param1 == param2 { 1 } else { 0 };
+                memory.set(result_addr, if param1 == param2 { 1 } else { 0 });
                 ip += 4
             }
             Instruction::Halt => {
@@ -216,7 +255,7 @@ fn execute_program(mut memory: Vec<i32>, input: Vec<i32>, existing_output: Vec<i
     })
 }
 
-fn amplifier_circuit(memory: Vec<i32>) -> i32 {
+fn amplifier_circuit(memory: Memory) -> i32 {
     let mut v = vec![0, 1, 2, 3, 4];
     let mut permutations = Vec::new();
     let mut max_thruster_signal = 0;
@@ -266,7 +305,7 @@ fn amplifier_circuit(memory: Vec<i32>) -> i32 {
     max_thruster_signal
 }
 
-fn feedback_amplifier_circuit(memory: Vec<i32>) -> i32 {
+fn feedback_amplifier_circuit(memory: Memory) -> i32 {
     let mut v = vec![5, 6, 7, 8, 9];
     let mut permutations = Vec::new();
     let mut max_thruster_signal = 0;
@@ -286,7 +325,7 @@ fn feedback_amplifier_circuit(memory: Vec<i32>) -> i32 {
     max_thruster_signal
 }
 
-fn feedback_amplifier_circuit_for_phase(memory: Vec<i32>, phase_setting: Vec<i32>) -> i32 {
+fn feedback_amplifier_circuit_for_phase(memory: Memory, phase_setting: Vec<i32>) -> i32 {
     let mut a_state = ProgState::new(memory.clone(), vec![phase_setting[0], 0]);
     let mut b_state = ProgState::new(memory.clone(), vec![phase_setting[1]]);
     let mut c_state = ProgState::new(memory.clone(), vec![phase_setting[2]]);
@@ -317,15 +356,6 @@ fn feedback_amplifier_circuit_for_phase(memory: Vec<i32>, phase_setting: Vec<i32
     }
 }
 
-fn mem_lookup(memory: &Vec<i32>, addr_type: &Address, instruction_pointer: &usize) -> i32 {
-    match addr_type {
-        Address::Immediate => memory[*instruction_pointer],
-        Address::Position => {
-            let ref_address: usize = memory[*instruction_pointer].try_into().unwrap();
-            memory[ref_address]
-        }
-    }
-}
 
 fn num_to_digits_rev(n: i32) -> Vec<u8> {
     let mut ds: Vec<u8> = Vec::new();
@@ -340,8 +370,8 @@ fn num_to_digits_rev(n: i32) -> Vec<u8> {
     ds
 }
 
-fn computer_memory() -> Vec<i32> {
-    vec![
+fn computer_memory() -> Memory {
+    let input = vec![
         3, 8, 1001, 8, 10, 8, 105, 1, 0, 0, 21, 34, 55, 68, 85, 106, 187, 268, 349, 430, 99999, 3,
         9, 1001, 9, 5, 9, 1002, 9, 5, 9, 4, 9, 99, 3, 9, 1002, 9, 2, 9, 1001, 9, 2, 9, 1002, 9, 5,
         9, 1001, 9, 2, 9, 4, 9, 99, 3, 9, 101, 3, 9, 9, 102, 3, 9, 9, 4, 9, 99, 3, 9, 1002, 9, 5,
@@ -361,7 +391,9 @@ fn computer_memory() -> Vec<i32> {
         99, 3, 9, 102, 2, 9, 9, 4, 9, 3, 9, 1001, 9, 1, 9, 4, 9, 3, 9, 102, 2, 9, 9, 4, 9, 3, 9,
         101, 1, 9, 9, 4, 9, 3, 9, 102, 2, 9, 9, 4, 9, 3, 9, 102, 2, 9, 9, 4, 9, 3, 9, 101, 2, 9, 9,
         4, 9, 3, 9, 101, 2, 9, 9, 4, 9, 3, 9, 1001, 9, 2, 9, 4, 9, 3, 9, 102, 2, 9, 9, 4, 9, 99,
-    ]
+    ];
+
+    Memory::from(input)
 }
 
 #[cfg(test)]
@@ -403,29 +435,29 @@ mod tests {
     fn test_addition_instruction() {
         assert_eq!(
             vec![2, 0, 0, 0, 99],
-            execute_program(vec![1, 0, 0, 0, 99], vec![1], Vec::new(), 0).unwrap_halt().memory
+            execute_program(Memory::from(vec![1, 0, 0, 0, 99]), vec![1], Vec::new(), 0).unwrap_halt().memory.main
         );
-        assert_eq!(vec![99], execute_program(vec![99], vec![1], Vec::new(), 0).unwrap_halt().memory);
+        assert_eq!(vec![99], execute_program(Memory::from(vec![99]), vec![1], Vec::new(), 0).unwrap_halt().memory.main);
         assert_eq!(
             vec![99, 1, 0, 0, 0],
-            execute_program(vec![99, 1, 0, 0, 0], vec![1], Vec::new(), 0).unwrap_halt().memory
+            execute_program(Memory::from(vec![99, 1, 0, 0, 0]), vec![1], Vec::new(), 0).unwrap_halt().memory.main
         );
         assert_eq!(
             vec![2, 3, 0, 6, 99],
-            execute_program(vec![2, 3, 0, 3, 99], vec![1], Vec::new(), 0).unwrap_halt().memory
+            execute_program(Memory::from(vec![2, 3, 0, 3, 99]), vec![1], Vec::new(), 0).unwrap_halt().memory.main
         );
         assert_eq!(
             vec![30, 1, 1, 4, 2, 5, 6, 0, 99],
-            execute_program(vec![1, 1, 1, 4, 99, 5, 6, 0, 99], vec![1], Vec::new(), 0).unwrap_halt().memory
+            execute_program(Memory::from(vec![1, 1, 1, 4, 99, 5, 6, 0, 99]), vec![1], Vec::new(), 0).unwrap_halt().memory.main
         );
     }
 
     #[test]
     fn test_execute_program_with_immediate_values() {
-        let r = execute_program(vec![3, 0, 4, 0, 99], vec![1], Vec::new(), 0).unwrap_halt();
+        let r = execute_program(Memory::from(vec![3, 0, 4, 0, 99]), vec![1], Vec::new(), 0).unwrap_halt();
         assert_eq!(
             vec![1, 0, 4, 0, 99],
-            r.memory
+            r.memory.main
         );
         assert_eq!(1, r.output[0]);
     }
@@ -434,7 +466,7 @@ mod tests {
     fn test_execute_program_with_immediate_values_from_example1() {
         assert_eq!(
             vec![1101, 100, -1, 4, 99],
-            execute_program(vec![1101, 100, -1, 4, 0], vec![1], Vec::new(), 0).unwrap_halt().memory
+            execute_program(Memory::from(vec![1101, 100, -1, 4, 0]), vec![1], Vec::new(), 0).unwrap_halt().memory.main
         );
     }
 
@@ -442,62 +474,64 @@ mod tests {
     fn test_execute_program_with_immediate_values_from_example2() {
         assert_eq!(
             vec![1002, 4, 3, 4, 99],
-            execute_program(vec![1002, 4, 3, 4, 33], vec![1], Vec::new(), 0).unwrap_halt().memory
+            execute_program(Memory::from(vec![1002, 4, 3, 4, 33]), vec![1], Vec::new(), 0).unwrap_halt().memory.main
         );
     }
 
     #[test]
     fn test_execute_program_position_input_is_8() {
-        let r = execute_program(vec![3, 9, 8, 9, 10, 9, 4, 9, 99, -1, 8], vec![8], Vec::new(), 0).unwrap_halt();
+        let r = execute_program(Memory::from(vec![3, 9, 8, 9, 10, 9, 4, 9, 99, -1, 8]), vec![8], Vec::new(), 0).unwrap_halt();
         assert_eq!(1, r.output[0]);
     }
 
     #[test]
     fn test_execute_program_position_input_is_not_8() {
-        let r = execute_program(vec![3, 9, 8, 9, 10, 9, 4, 9, 99, -1, 8], vec![9], Vec::new(), 0).unwrap_halt();
+        let r = execute_program(Memory::from(vec![3, 9, 8, 9, 10, 9, 4, 9, 99, -1, 8]), vec![9], Vec::new(), 0).unwrap_halt();
         assert_eq!(0, r.output[0]);
     }
 
     #[test]
     fn test_execute_program_position_input_is_less_than_8() {
-        let r = execute_program(vec![3, 9, 7, 9, 10, 9, 4, 9, 99, -1, 8], vec![7], Vec::new(), 0).unwrap_halt();
+        let r = execute_program(Memory::from(vec![3, 9, 7, 9, 10, 9, 4, 9, 99, -1, 8]), vec![7], Vec::new(), 0).unwrap_halt();
         assert_eq!(1, r.output[0]);
     }
 
     #[test]
     fn test_execute_program_position_input_is_greater_than_8() {
-        let r = execute_program(vec![3, 9, 7, 9, 10, 9, 4, 9, 99, -1, 8], vec![9], Vec::new(), 0).unwrap_halt();
+        let r = execute_program(Memory::from(vec![3, 9, 7, 9, 10, 9, 4, 9, 99, -1, 8]), vec![9], Vec::new(), 0).unwrap_halt();
         assert_eq!(0, r.output[0]);
     }
 
     #[test]
     fn test_execute_program_immediate_input_is_equal_8() {
-        let r = execute_program(vec![3, 3, 1108, -1, 8, 3, 4, 3, 99], vec![8], Vec::new(), 0).unwrap_halt();
+        let r = execute_program(Memory::from(vec![3, 3, 1108, -1, 8, 3, 4, 3, 99]), vec![8], Vec::new(), 0).unwrap_halt();
         assert_eq!(1, r.output[0]);
     }
 
     #[test]
     fn test_execute_program_immediate_input_is_not_equal_8() {
-        let r = execute_program(vec![3, 3, 1108, -1, 8, 3, 4, 3, 99], vec![9], Vec::new(), 0).unwrap_halt();
+        let r = execute_program(Memory::from(vec![3, 3, 1108, -1, 8, 3, 4, 3, 99]), vec![9], Vec::new(), 0).unwrap_halt();
         assert_eq!(0, r. output[0]);
     }
 
     #[test]
     fn test_execute_program_immediate_input_is_less_than_8() {
-        let r = execute_program(vec![3, 3, 1107, -1, 8, 3, 4, 3, 99], vec![7], Vec::new(), 0).unwrap_halt();
+        let r = execute_program(Memory::from(vec![3, 3, 1107, -1, 8, 3, 4, 3, 99]), vec![7], Vec::new(), 0).unwrap_halt();
         assert_eq!(1, r.output[0]);
     }
 
     #[test]
     fn test_execute_program_immediate_input_is_greater_than_8() {
-        let r = execute_program(vec![3, 3, 1107, -1, 8, 3, 4, 3, 99], vec![9], Vec::new(), 0).unwrap_halt();
+        let r = execute_program(Memory::from(vec![3, 3, 1107, -1, 8, 3, 4, 3, 99]), vec![9], Vec::new(), 0).unwrap_halt();
         assert_eq!(0, r.output[0]);
     }
 
     #[test]
     fn test_execute_program_position_jump_test_input_nonzero() {
         let r = execute_program(
-            vec![3, 12, 6, 12, 15, 1, 13, 14, 13, 4, 13, 99, -1, 0, 1, 9],
+            Memory::from(
+                vec![3, 12, 6, 12, 15, 1, 13, 14, 13, 4, 13, 99, -1, 0, 1, 9]
+            ),
             vec![9],
             Vec::new(),
             0
@@ -508,7 +542,9 @@ mod tests {
     #[test]
     fn test_execute_program_position_jump_test_input_zero() {
         let r = execute_program(
-            vec![3, 12, 6, 12, 15, 1, 13, 14, 13, 4, 13, 99, -1, 0, 1, 9],
+            Memory::from(
+                vec![3, 12, 6, 12, 15, 1, 13, 14, 13, 4, 13, 99, -1, 0, 1, 9]
+            ),
             vec![0],
             Vec::new(),
             0
@@ -519,11 +555,12 @@ mod tests {
     #[test]
     fn test_execute_program_largest_example_less_than_8() {
         let r = execute_program(
-            vec![
-                3, 21, 1008, 21, 8, 20, 1005, 20, 22, 107, 8, 21, 20, 1006, 20, 31, 1106, 0, 36,
-                98, 0, 0, 1002, 21, 125, 20, 4, 20, 1105, 1, 46, 104, 999, 1105, 1, 46, 1101, 1000,
-                1, 20, 4, 20, 1105, 1, 46, 98, 99,
-            ],
+            Memory::from(
+                vec![
+                    3, 21, 1008, 21, 8, 20, 1005, 20, 22, 107, 8, 21, 20, 1006, 20, 31, 1106, 0, 36,
+                    98, 0, 0, 1002, 21, 125, 20, 4, 20, 1105, 1, 46, 104, 999, 1105, 1, 46, 1101, 1000,
+                    1, 20, 4, 20, 1105, 1, 46, 98, 99,
+                ]),
             vec![5],
             Vec::new(),
             0
@@ -534,11 +571,12 @@ mod tests {
     #[test]
     fn test_execute_program_largest_example_equal_8() {
         let r = execute_program(
-            vec![
-                3, 21, 1008, 21, 8, 20, 1005, 20, 22, 107, 8, 21, 20, 1006, 20, 31, 1106, 0, 36,
-                98, 0, 0, 1002, 21, 125, 20, 4, 20, 1105, 1, 46, 104, 999, 1105, 1, 46, 1101, 1000,
-                1, 20, 4, 20, 1105, 1, 46, 98, 99,
-            ],
+            Memory::from(
+                vec![
+                    3, 21, 1008, 21, 8, 20, 1005, 20, 22, 107, 8, 21, 20, 1006, 20, 31, 1106, 0, 36,
+                    98, 0, 0, 1002, 21, 125, 20, 4, 20, 1105, 1, 46, 104, 999, 1105, 1, 46, 1101, 1000,
+                    1, 20, 4, 20, 1105, 1, 46, 98, 99,
+                ]),
             vec![8],
             Vec::new(),
             0,
@@ -549,11 +587,11 @@ mod tests {
     #[test]
     fn test_execute_program_largest_example_more_than_8() {
         let r = execute_program(
-            vec![
+            Memory::from(vec![
                 3, 21, 1008, 21, 8, 20, 1005, 20, 22, 107, 8, 21, 20, 1006, 20, 31, 1106, 0, 36,
                 98, 0, 0, 1002, 21, 125, 20, 4, 20, 1105, 1, 46, 104, 999, 1105, 1, 46, 1101, 1000,
                 1, 20, 4, 20, 1105, 1, 46, 98, 99,
-            ],
+            ]),
             vec![10],
             Vec::new(),
             0
@@ -566,9 +604,11 @@ mod tests {
         // max signal from sequence 4,3,2,1,0
         assert_eq!(
             43210,
-            amplifier_circuit(vec![
-                3, 15, 3, 16, 1002, 16, 10, 16, 1, 16, 15, 15, 4, 15, 99, 0, 0
-            ])
+            amplifier_circuit(Memory::from(
+                vec![
+                    3, 15, 3, 16, 1002, 16, 10, 16, 1, 16, 15, 15, 4, 15, 99, 0, 0
+                ])
+            )
         );
     }
 
@@ -577,10 +617,12 @@ mod tests {
         // max signal from sequence 0,1,2,3,4
         assert_eq!(
             54321,
-            amplifier_circuit(vec![
-                3, 23, 3, 24, 1002, 24, 10, 24, 1002, 23, -1, 23, 101, 5, 23, 23, 1, 24, 23, 23, 4,
-                23, 99, 0, 0
-            ])
+            amplifier_circuit(Memory::from(
+                vec![
+                    3, 23, 3, 24, 1002, 24, 10, 24, 1002, 23, -1, 23, 101, 5, 23, 23, 1, 24, 23, 23, 4,
+                    23, 99, 0, 0
+                ])
+            )
         );
     }
 
@@ -589,10 +631,12 @@ mod tests {
         // max signal from sequence 1,0,4,3,2
         assert_eq!(
             65210,
-            amplifier_circuit(vec![
-                3, 31, 3, 32, 1002, 32, 10, 32, 1001, 31, -2, 31, 1007, 31, 0, 33, 1002, 33, 7, 33,
-                1, 33, 31, 31, 1, 32, 31, 31, 4, 31, 99, 0, 0, 0
-            ])
+            amplifier_circuit(Memory::from(
+                vec![
+                    3, 31, 3, 32, 1002, 32, 10, 32, 1001, 31, -2, 31, 1007, 31, 0, 33, 1002, 33, 7, 33,
+                    1, 33, 31, 31, 1, 32, 31, 31, 4, 31, 99, 0, 0, 0
+                ])
+            )
         );
     }
 
@@ -606,11 +650,11 @@ mod tests {
 
     #[test]
     fn test_feedback_amplifier_circuit_for_phase_suspend_waiting_for_input() {
-        let s = execute_program(vec![3, 0, 99], Vec::new(), Vec::new(), 0).unwrap_suspend();
+        let s = execute_program(Memory::from(vec![3, 0, 99]), Vec::new(), Vec::new(), 0).unwrap_suspend();
 
-        let expected = execute_program(s.memory.clone(), vec![1], s.output.clone(), s.instruction_pointer).unwrap_halt();
+        let expected = execute_program(Memory::from(s.memory.main.clone()), vec![1], s.output.clone(), s.instruction_pointer).unwrap_halt();
 
-        assert_eq!(vec![1, 0, 99], expected.memory);
+        assert_eq!(vec![1, 0, 99], expected.memory.main);
         assert_eq!(2, expected.instruction_pointer);
     }
 
@@ -618,22 +662,26 @@ mod tests {
     fn test_feedback_amplifier_circuit_for_phase_with_suspend_example_00() {
         assert_eq!(
             54321,
-            feedback_amplifier_circuit_for_phase(vec![
-                3, 23, 3, 24, 1002, 24, 10, 24, 1002, 23, -1, 23, 101, 5, 23, 23, 1, 24, 23, 23, 4,
-                23, 99, 0, 0
-            ], vec![0, 1, 2, 3, 4])
+            feedback_amplifier_circuit_for_phase(
+                Memory::from(
+                    vec![
+                        3, 23, 3, 24, 1002, 24, 10, 24, 1002, 23, -1, 23, 101, 5, 23, 23, 1, 24, 23, 23, 4,
+                        23, 99, 0, 0
+                    ]),
+                vec![0, 1, 2, 3, 4])
         );
-
     }
 
     #[test]
     fn test_feedback_amplifier_circuit_for_phase_with_suspend_example_01() {
         assert_eq!(
             139629729,
-            feedback_amplifier_circuit_for_phase(vec![
-                3,26,1001,26,-4,26,3,27,1002,27,2,27,1,27,26,
-                27,4,27,1001,28,-1,28,1005,28,6,99,0,0,5
-            ], vec![9, 8, 7, 6, 5])
+            feedback_amplifier_circuit_for_phase(
+                Memory::from(vec![
+                    3,26,1001,26,-4,26,3,27,1002,27,2,27,1,27,26,
+                    27,4,27,1001,28,-1,28,1005,28,6,99,0,0,5
+                ]),
+                vec![9, 8, 7, 6, 5])
         );
 
     }
