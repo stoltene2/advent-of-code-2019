@@ -12,9 +12,9 @@ enum Address {
 
 #[derive(Debug, Clone, PartialEq)]
 struct Memory {
-    main: Vec<i32>,
-    ext: HashMap<usize, i32>,
-    relative_base: i32, // Store this on the memory instead of the prog state
+    main: Vec<i64>,
+    ext: HashMap<usize, i64>,
+    relative_base: i64, // Store this on the memory instead of the prog state
 }
 
 // Memory can be moved to its own module
@@ -27,7 +27,7 @@ impl Memory {
         }
     }
 
-    fn from(input: Vec<i32>) -> Memory {
+    fn from(input: Vec<i64>) -> Memory {
         Memory {
             main: input,
             ext: HashMap::new(),
@@ -36,7 +36,7 @@ impl Memory {
     }
 
     // TODO: Should have a variant for getting a usize back
-    fn get(&self, address: usize) -> i32 {
+    fn get(&self, address: usize) -> i64 {
         if (address < self.main.len()) {
             self.main[address].try_into().unwrap()
         } else {
@@ -44,7 +44,7 @@ impl Memory {
         }
     }
 
-    fn set(&mut self, address: usize, value: i32) {
+    fn set(&mut self, address: usize, value: i64) {
         if (address < self.main.len()) {
             self.main[address] = value;
         } else {
@@ -53,7 +53,7 @@ impl Memory {
     }
 
     // Like a get but uses the Address type
-    fn lookup(&self, addr_type: &Address, offset: usize) -> i32 {
+    fn lookup(&self, addr_type: &Address, offset: usize) -> i64 {
         match addr_type {
             Address::Immediate => self.get(offset),
             Address::Position => {
@@ -86,7 +86,7 @@ enum Instruction {
 }
 
 impl Instruction {
-    fn parse(n: i32) -> Instruction {
+    fn parse(n: i64) -> Instruction {
         let digits = num_to_digits_rev(n);
 
         let intcode = digits.get(1).unwrap_or(&0) * 10 + digits.get(0).unwrap();
@@ -113,15 +113,15 @@ impl Instruction {
 
 #[derive(Debug, PartialEq)]
 struct ProgState {
-    output: Vec<i32>,
-    input: Vec<i32>,
+    output: Vec<i64>,
+    input: Vec<i64>,
     memory: Memory,
     instruction_pointer: usize,
 }
 
 impl ProgState {
 
-    fn new(memory: Memory, input: Vec<i32>) -> ProgState {
+    fn new(memory: Memory, input: Vec<i64>) -> ProgState {
         ProgState {
             memory,
             instruction_pointer: 0,
@@ -185,7 +185,7 @@ fn main() {
 }
 
 // Make this take ProgState
-fn execute_program(mut memory: Memory, input: Vec<i32>, existing_output: Vec<i32>, ip: usize) -> ProgResult {
+fn execute_program(mut memory: Memory, input: Vec<i64>, existing_output: Vec<i64>, ip: usize) -> ProgResult {
     let mut ip: usize = ip.clone();
     let mut output = existing_output.clone();
     let mut input_iter: _ = input.into_iter();
@@ -287,7 +287,7 @@ fn execute_program(mut memory: Memory, input: Vec<i32>, existing_output: Vec<i32
     })
 }
 
-fn amplifier_circuit(memory: Memory) -> i32 {
+fn amplifier_circuit(memory: Memory) -> i64 {
     let mut v = vec![0, 1, 2, 3, 4];
     let mut permutations = Vec::new();
     let mut max_thruster_signal = 0;
@@ -337,7 +337,7 @@ fn amplifier_circuit(memory: Memory) -> i32 {
     max_thruster_signal
 }
 
-fn feedback_amplifier_circuit(memory: Memory) -> i32 {
+fn feedback_amplifier_circuit(memory: Memory) -> i64 {
     let mut v = vec![5, 6, 7, 8, 9];
     let mut permutations = Vec::new();
     let mut max_thruster_signal = 0;
@@ -357,7 +357,7 @@ fn feedback_amplifier_circuit(memory: Memory) -> i32 {
     max_thruster_signal
 }
 
-fn feedback_amplifier_circuit_for_phase(memory: Memory, phase_setting: Vec<i32>) -> i32 {
+fn feedback_amplifier_circuit_for_phase(memory: Memory, phase_setting: Vec<i64>) -> i64 {
     let mut a_state = ProgState::new(memory.clone(), vec![phase_setting[0], 0]);
     let mut b_state = ProgState::new(memory.clone(), vec![phase_setting[1]]);
     let mut c_state = ProgState::new(memory.clone(), vec![phase_setting[2]]);
@@ -389,7 +389,7 @@ fn feedback_amplifier_circuit_for_phase(memory: Memory, phase_setting: Vec<i32>)
 }
 
 
-fn num_to_digits_rev(n: i32) -> Vec<u8> {
+fn num_to_digits_rev(n: i64) -> Vec<u8> {
     let mut ds: Vec<u8> = Vec::new();
     let mut res = n;
 
@@ -748,7 +748,7 @@ mod tests {
     #[test]
     fn test_relative_base_opcode_example_01() {
         // Quine example
-        let input: Vec<i32> = vec![109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99];
+        let input: Vec<i64> = vec![109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99];
         let mut mem = Memory::from(input.clone());
 
         let output_state = execute_program(mem, Vec::new(), Vec::new(), 0).unwrap_halt();
@@ -756,16 +756,26 @@ mod tests {
         assert_eq!(input, output_state.output);
     }
 
+    // This test is the reason I need to use 64 bit signed integers
+    #[test]
+    fn test_relative_base_opcode_example_02_outputs_16_digit_number() {
+        let input: Vec<i64> = vec![1102,34915192,34915192,7,4,7,99,0];
+        let mut mem = Memory::from(input.clone());
 
-    // First test passes. This test has type out of bounds
-    // #[test]
-    // fn test_relative_base_opcode_example_02_outputs_16_digit_number() {
-    //     let input: Vec<i32> = vec![1102,34915192,34915192,7,4,7,99,0];
-    //     let mut mem = Memory::from(input.clone());
+        let output_state = execute_program(mem, Vec::new(), Vec::new(), 0).unwrap_halt();
 
-    //     let output_state = execute_program(mem, Vec::new(), Vec::new(), 0).unwrap_halt();
+        assert_eq!(1219070632396864, output_state.output[0]);
+    }
 
-    //     assert_eq!(16, output_state.output.len());
-    // }
+
+    #[test]
+    fn test_relative_base_opcode_example_03_outputs_16_digit_number_from_second_param() {
+        let input: Vec<i64> = vec![104,1125899906842624,99];
+        let mut mem = Memory::from(input.clone());
+
+        let output_state = execute_program(mem, Vec::new(), Vec::new(), 0).unwrap_halt();
+
+        assert_eq!(input[1], output_state.output[0]);
+    }
 
 }
