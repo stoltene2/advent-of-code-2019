@@ -81,6 +81,7 @@ enum Instruction {
     JumpIfFalse(Address, Address),
     LessThan(Address, Address, Address),
     Equals(Address, Address, Address),
+    AdjustRelativeBase(Address),
     // TODO: I think I should go back to three addresses. It's just easier
 }
 
@@ -102,6 +103,7 @@ impl Instruction {
             6 => Instruction::JumpIfFalse(param1, param2),
             7 => Instruction::LessThan(param1, param2, param3),
             8 => Instruction::Equals(param1, param2, param3),
+            9 => Instruction::AdjustRelativeBase(param1),
             99 => Instruction::Halt,
             _ => panic!("Invalid Opcode: {}", n),
         }
@@ -263,6 +265,12 @@ fn execute_program(mut memory: Memory, input: Vec<i32>, existing_output: Vec<i32
 
                 memory.set(result_addr, if param1 == param2 { 1 } else { 0 });
                 ip += 4
+            }
+            Instruction::AdjustRelativeBase(a1) => {
+                // Assume for now that it just has a value and it isn't using other input types...
+                let relative_base = memory.lookup(&a1, ip + 1);
+                memory.relative_base += relative_base;
+                ip += 2
             }
             Instruction::Halt => {
                 break;
@@ -736,5 +744,28 @@ mod tests {
 
         assert_eq!(0, output_state.output[0]);
     }
+
+    #[test]
+    fn test_relative_base_opcode_example_01() {
+        // Quine example
+        let input: Vec<i32> = vec![109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99];
+        let mut mem = Memory::from(input.clone());
+
+        let output_state = execute_program(mem, Vec::new(), Vec::new(), 0).unwrap_halt();
+
+        assert_eq!(input, output_state.output);
+    }
+
+
+    // First test passes. This test has type out of bounds
+    // #[test]
+    // fn test_relative_base_opcode_example_02_outputs_16_digit_number() {
+    //     let input: Vec<i32> = vec![1102,34915192,34915192,7,4,7,99,0];
+    //     let mut mem = Memory::from(input.clone());
+
+    //     let output_state = execute_program(mem, Vec::new(), Vec::new(), 0).unwrap_halt();
+
+    //     assert_eq!(16, output_state.output.len());
+    // }
 
 }
