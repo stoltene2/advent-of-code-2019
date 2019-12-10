@@ -7,19 +7,23 @@ use permutohedron::heap_recursive;
 enum Address {
     Immediate,
     Position,
+    Relative,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 struct Memory {
     main: Vec<i32>,
     ext: HashMap<usize, i32>,
+    relative_base: i32, // Store this on the memory instead of the prog state
 }
 
+// Memory can be moved to its own module
 impl Memory {
     fn new() -> Memory {
         Memory {
             main: Vec::new(),
             ext: HashMap::new(),
+            relative_base: 0,
         }
     }
 
@@ -27,6 +31,7 @@ impl Memory {
         Memory {
             main: input,
             ext: HashMap::new(),
+            relative_base: 0,
         }
     }
 
@@ -48,11 +53,16 @@ impl Memory {
     }
 
     // Like a get but uses the Address type
-    fn lookup(&self, addr_type: &Address, instruction_pointer: usize) -> i32 {
+    fn lookup(&self, addr_type: &Address, offset: usize) -> i32 {
         match addr_type {
-            Address::Immediate => self.get(instruction_pointer),
+            Address::Immediate => self.get(offset),
             Address::Position => {
-                let ref_address: usize = self.get(instruction_pointer).try_into().unwrap();
+                let position_address: usize = self.get(offset).try_into().unwrap();
+                self.get(position_address)
+            },
+            Address::Relative => {
+                let o = self.get(offset);
+                let ref_address: usize = (o + self.relative_base).try_into().unwrap();
                 self.get(ref_address)
             }
         }
@@ -157,10 +167,11 @@ impl ProgResult {
 
 // TODO: Make a helper for this in impl Address
 fn int_to_address(n: &u8) -> Address {
-    if *n == 1_u8 {
-        Address::Immediate
-    } else {
-        Address::Position
+    match *n {
+        0 => Address::Position,
+        1 => Address::Immediate,
+        2 => Address::Relative,
+        _ => panic!("Unknow address type: {}", n)
     }
 }
 
