@@ -38,13 +38,6 @@ impl Segment {
     }
 
     fn contains(&self, p: &Point) -> bool {
-
-        // if self.p1.x == 2 && self.p1.y == 2 && p.x == 3 && p.y == 4 {
-
-        //     // I can make a test case for this
-        //     println!("(2,2) considering {:?}", p);
-        // }
-
         if self.p1 == *p || self.p2 == *p {
             return true;
         }
@@ -121,7 +114,7 @@ impl Segment {
 }
 
 fn input_to_points(input: &Vec<String>) -> Vec<Point> {
-    let row_len = input[0].len();
+    let row_len = input[0].as_bytes().len();
     let mut asteroids: Vec<Point> = Vec::with_capacity(row_len*input.len());
 
     for y in 0..input.len() {
@@ -134,6 +127,7 @@ fn input_to_points(input: &Vec<String>) -> Vec<Point> {
         }
     }
 
+    // println!("Asteroid Field\n{:#?}", &asteroids);
     asteroids
 }
 
@@ -150,39 +144,51 @@ fn all_pairs<'a, T>(v: &'a Vec<T>) -> Vec<(&'a T, &'a T)> {
 }
 
 fn find_best_asteroid(input: Vec<String>) -> (Point, u32) {
-    let input = program_input();
-
     let row_len = input[0].len();
 
     let asteroids = input_to_points(&input);
     let mut h: HashMap<Point, u32> = HashMap::new();
 
-    for (i, (p1, p2)) in all_pairs(&asteroids).into_iter().enumerate() {
+//    for (i, (p1, p2)) in all_pairs(&asteroids).into_iter().enumerate() {
 
-        let s = Segment::new(*p1, *p2);
+    for (i, p) in asteroids.iter().enumerate() {
+        for j in i+1..asteroids.len() {
+            // if *p1 == Point::new(31, 0) {
+            //     panic!("I should not be here");
+            // }
 
-        // This includes too many points to check. It should only
-        // consider points ahead of p1, not _all_ asteroids That's
-        // what this line below does I think i need to put this into
-        // one long vector to check and do the double loop.  This
-        // approach I used below mixes two concepts. Using an index
-        // from all pairs into the asteroids vec. Bad
-//        let asteroids_to_check: Vec<_> = asteroids.iter().skip(i).map(|p| *p).collect();
-//        let points_to_check = s.points_on_segment(&asteroids_to_check);
-        let points_to_check = s.points_on_segment(&asteroids);
+            let p1 = p;
+            let p2 = asteroids[j];
 
-        let closest_point = s.line_of_sight(&points_to_check);
-        if closest_point == *p2 {
-            if let Some(count) = h.get(p1) {
-                h.insert(*p1, count+1);
-            } else {
-                h.insert(*p1, 1);
-            }
+            let s = Segment::new(*p1, p2);
 
-            if let Some(count) = h.get(p2) {
-                h.insert(*p2, count+1);
-            } else {
-                h.insert(*p2, 1);
+            // This includes too many points to check. It should only
+            // consider points ahead of p1, not _all_ asteroids That's
+            // what this line below does I think i need to put this into
+            // one long vector to check and do the double loop.  This
+            // approach I used below mixes two concepts. Using an index
+            // from all pairs into the asteroids vec. Bad
+            // let asteroids_to_check: Vec<_> = asteroids.iter().skip(i).map(|p| *p).collect();
+            // let points_to_check = s.points_on_segment(&asteroids_to_check);
+            let points_to_check = s.points_on_segment(&asteroids);
+
+            let closest_point = s.line_of_sight(&points_to_check);
+            if closest_point == p2 {
+                if p1.x == 31 && p1.y == 0 {
+                    panic!("How did I get here? {:?} - {:?}", p1, p2);
+                }
+
+                if let Some(count) = h.get(&p1) {
+                    h.insert(*p1, count+1);
+                } else {
+                    h.insert(*p1, 1);
+                }
+
+                if let Some(count) = h.get(&p2) {
+                    h.insert(p2, count+1);
+                } else {
+                    h.insert(p2, 1);
+                }
             }
         }
     }
@@ -455,8 +461,10 @@ mod test {
         assert_eq!(vec![&p2], s.points_on_segment(&vec![bad, p1, p2]));
     }
 
-    #[test]
 
+    // TODO: Most below here are failing
+
+    #[test]
     fn test_example_1() {
         let input = vec![
             String::from("......#.#."),
@@ -475,10 +483,74 @@ mod test {
         assert_eq!((p, 33), find_best_asteroid(input));
     }
 
+    #[test]
     fn test_example_2() {
+        let input = vec![
+            String::from("#.#...#.#."),
+            String::from(".###....#."),
+            String::from(".#....#..."),
+            String::from("##.#.#.#.#"),
+            String::from("....#.#.#."),
+            String::from(".##..###.#"),
+            String::from("..#...##.."),
+            String::from("..##....##"),
+            String::from("......#..."),
+            String::from(".####.###."),
+        ];
+
+        let p = Point::new(1, 2);
+        assert_eq!((p, 35), find_best_asteroid(input));
+
     }
 
+    #[test]
     fn test_example_3() {
+        let input = vec![
+            String::from(".#..#..###"),
+            String::from("####.###.#"),
+            String::from("....###.#."),
+            String::from("..###.##.#"),
+            String::from("##.##.#.#."),
+            String::from("....###..#"),
+            String::from("..#.#..#.#"),
+            String::from("#..#.#.###"),
+            String::from(".##...##.#"),
+            String::from(".....#.#.."),
+        ];
+
+        let p = Point::new(6, 3);
+        assert_eq!((p, 41), find_best_asteroid(input));
     }
+
+    #[test]
+    fn test_example_4() {
+        let input = vec![
+            String::from(".#..##.###...#######"),
+            String::from("##.############..##."),
+            String::from(".#.######.########.#"),
+            String::from(".###.#######.####.#."),
+            String::from("#####.##.#.##.###.##"),
+            String::from("..#####..#.#########"),
+            String::from("####################"),
+            String::from("#.####....###.#.#.##"),
+            String::from("##.#################"),
+            String::from("#####.##.###..####.."),
+            String::from("..######..##.#######"),
+            String::from("####.##.####...##..#"),
+            String::from(".#####..#.######.###"),
+            String::from("##...#.##########..."),
+            String::from("#.##########.#######"),
+            String::from(".####.#.###.###.#.##"),
+            String::from("....##.##.###..#####"),
+            String::from(".#.#.###########.###"),
+            String::from("#.#.#.#####.####.###"),
+            String::from("###.##.####.##.#..##"),
+        ];
+
+        let p = Point::new(6, 3);
+        assert_eq!((p, 41), find_best_asteroid(input));
+    }
+
+
 
 }
