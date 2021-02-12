@@ -4,6 +4,7 @@
 extern crate num;
 use std::convert::TryInto;
 use std::collections::HashMap;
+use std::cmp::Ordering;
 use num::FromPrimitive;
 use num::rational::*;
 
@@ -22,6 +23,59 @@ impl Point {
     fn euclidean_metric(&self, p: &Point) -> i16 {
         (self.x - p.x).pow(2) + (self.y - p.y).pow(2)
     }
+
+    fn angle_metric(&self, p: &Point) -> f32 {
+        use std::f32::consts::PI;
+
+        // let rel_x: f32 = (p.x - self.x).into();
+        // let rel_y: f32 = (p.y - self.y).into();
+
+        let rel_y: f32 = (p.x - self.x).into();
+        let rel_x: f32 = (p.y - self.y).into();
+
+        let pi_2: f32 = PI/2.0;
+
+        let quadrant_offset: f32 = if rel_x < 0.0 && rel_y < 0.0 {
+            //Quad 2
+            pi_2
+        } else if rel_x <= 0.0 {
+            //Quad 0
+            //3.0*pi_2
+            0_f32
+        } else if rel_y <= 0.0 {
+            //Quad ?
+            3.0*pi_2
+        } else {
+            2.0*pi_2
+            //Quad ?
+        };
+
+        let ratio: f32 = (rel_y / rel_x).abs();
+
+        quadrant_offset + ratio.atan()
+
+    }
+
+    fn cmp(&self, other: &Point) -> Ordering {
+        // I think I can use some of the convenience methods here
+        // https://doc.rust-lang.org/std/cmp/enum.Ordering.html#method.then_with
+        // I don't know how to implement this Trait correctly
+
+        if self.x == other.x && self.y == other.y {
+            return Ordering::Equal;
+        }
+
+        if self.y <= other.y {
+            if self.x < other.x {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            }
+        } else {
+            Ordering::Greater
+        }
+    }
+
 }
 
 #[derive(Debug)]
@@ -42,6 +96,16 @@ impl Segment {
             return true;
         }
 
+        // Verify that p is in the bounding box of self
+        let min_x = self.p1.x.min(self.p2.x);
+        let max_x = self.p1.x.max(self.p2.x);
+        let min_y = self.p1.y.min(self.p2.y);
+        let max_y = self.p1.y.max(self.p2.y);
+        if p.x < min_x || max_x < p.x || p.y < min_y || max_y < p.y {
+            // Bail out if we are not in the segment
+            return false;
+        }
+
         if self.p1.x == self.p2.x {
             // Vertical segment
             if self.p1.y < p.y && p.y < self.p2.y && self.p1.x == p.x {
@@ -57,11 +121,6 @@ impl Segment {
                 return false;
             }
         } else {
-            if p.x < self.p1.x || self.p2.x < p.x || p.y < self.p1.y || self.p2.y < p.y {
-                // Bail out if we are not in the segment
-                return false;
-            }
-
             // diagonal - non-zero or 1 slope
             // y = mx + b
 
@@ -87,7 +146,7 @@ impl Segment {
         false
     }
 
-    // Starts with the first point in the vector
+    // Starts with the first point in the Segment
     fn line_of_sight(&self, points: &Vec<&Point>) -> Point {
         let mut ps = points.clone();
         if ps.is_empty() {
@@ -121,13 +180,15 @@ fn input_to_points(input: &Vec<String>) -> Vec<Point> {
         for x in 0..row_len {
             let val = input[y].as_bytes()[x];
 
-            if val == b'#' {
+            // Take any non dot as an asteroid. It helps make good
+            // examples for tests using A and a.
+            if val != b'.' {
                 asteroids.push(Point::new(x.try_into().unwrap(), y.try_into().unwrap()));
             }
         }
     }
 
-    // println!("Asteroid Field\n{:#?}", &asteroids);
+    asteroids.sort_by(|p1, p2| p1.cmp(&p2));
     asteroids
 }
 
@@ -142,14 +203,9 @@ fn all_pairs<'a, T>(v: &'a Vec<T>) -> Vec<(&'a T, &'a T)> {
 
     result
 }
+fn find_asteroid_counts(asteroids: &Vec<Point>) -> HashMap<Point, u32> {
 
-fn find_best_asteroid(input: Vec<String>) -> (Point, u32) {
-    let row_len = input[0].len();
-
-    let asteroids = input_to_points(&input);
     let mut h: HashMap<Point, u32> = HashMap::new();
-
-//    for (i, (p1, p2)) in all_pairs(&asteroids).into_iter().enumerate() {
 
     for (i, p) in asteroids.iter().enumerate() {
         for j in i+1..asteroids.len() {
@@ -162,22 +218,14 @@ fn find_best_asteroid(input: Vec<String>) -> (Point, u32) {
 
             let s = Segment::new(*p1, p2);
 
-            // This includes too many points to check. It should only
-            // consider points ahead of p1, not _all_ asteroids That's
-            // what this line below does I think i need to put this into
-            // one long vector to check and do the double loop.  This
-            // approach I used below mixes two concepts. Using an index
-            // from all pairs into the asteroids vec. Bad
             // let asteroids_to_check: Vec<_> = asteroids.iter().skip(i).map(|p| *p).collect();
             // let points_to_check = s.points_on_segment(&asteroids_to_check);
             let points_to_check = s.points_on_segment(&asteroids);
 
             let closest_point = s.line_of_sight(&points_to_check);
-            if closest_point == p2 {
-                if p1.x == 31 && p1.y == 0 {
-                    panic!("How did I get here? {:?} - {:?}", p1, p2);
-                }
 
+            // If closest point and end point are equal
+            if closest_point.cmp(&p2) == Ordering::Equal {
                 if let Some(count) = h.get(&p1) {
                     h.insert(*p1, count+1);
                 } else {
@@ -193,6 +241,23 @@ fn find_best_asteroid(input: Vec<String>) -> (Point, u32) {
         }
     }
 
+    h
+}
+
+fn find_best_asteroid(input: Vec<String>) -> (Point, u32) {
+    let row_len = input[0].len();
+
+    let asteroids = input_to_points(&input);
+
+    let is_sorted = asteroids.iter()
+        .zip(asteroids.iter().skip(1))
+        .all(|(p1, p2)| {
+            p1.y <= p2.y && p1.x <= p2.y
+        });
+
+    // assert!(is_sorted);
+
+    let h = find_asteroid_counts(&asteroids);
     let (p, max) = h.iter().max_by(|(_, v1), (_, v2)| v1.cmp(&v2)).unwrap();
 
     (*p, *max)
@@ -353,6 +418,18 @@ mod test {
     }
 
     #[test]
+    fn test_any_segment_contains_last_endpoint_right_to_left_diagonal() {
+        // ...#
+        // ....
+        // #...
+        let p1 = Point::new(3,0);
+        let p2 = Point::new(0,2);
+        let seg = Segment::new(p1, p2);
+
+        assert!(seg.contains(&p2));
+    }
+
+    #[test]
     fn test_any_segment_does_not_contain_exterior_point() {
         // #...#.....
         // ..........
@@ -461,6 +538,75 @@ mod test {
         assert_eq!(vec![&p2], s.points_on_segment(&vec![bad, p1, p2]));
     }
 
+    #[test]
+    fn test_find_points_on_segment_negative_slope() {
+        // ...2
+        // ..3.
+        // .2..
+        let p1 = Point::new(3,0);
+        let good = Point::new(2, 1);
+        let p2 = Point::new(1,2);
+
+        let s = Segment::new(p1, p2);
+
+        assert!(s.contains(&good));
+        assert_eq!(vec![&good, &p2], s.points_on_segment(&vec![good, p1, p2]));
+    }
+
+
+    #[test]
+    fn test_paths_from_example() {
+        let asteroids = input_to_points(&vec![
+            String::from("#........."),
+            String::from("...A......"),
+            String::from("...B..a..."),
+            String::from(".EDCG....a"),
+            String::from("..F.c.b..."),
+            String::from(".....c...."),
+            String::from("..efd.c.gb"),
+            String::from(".......c.."),
+            String::from("....f...c."),
+            String::from("...e..d..c"),
+        ]);
+
+        // A (0,0) -> (9,3) = (3,1)
+        let p1 = Point::new(0,0);
+        let p2 = Point::new(9,3);
+        let s = Segment::new(p1,p2);
+        let ps = s.points_on_segment(&asteroids);
+        assert_eq!(Point::new(3,1), s.line_of_sight(&ps));
+
+
+        // C
+        // (0,0) -> (9,9) = (3,3)
+        let p1 = Point::new(0,0);
+        let p2 = Point::new(9,9);
+        let s = Segment::new(p1,p2);
+        let ps = s.points_on_segment(&asteroids);
+        assert_eq!(Point::new(3,3), s.line_of_sight(&ps));
+
+        // # should see 7
+        assert_eq!(Some(&7), find_asteroid_counts(&asteroids).get(&p1));
+    }
+
+    #[test]
+    fn test_paths_from_simple_example() {
+        let asteroids = input_to_points(&vec![
+            String::from("...2"),
+            String::from("..3."),
+            String::from(".23."),
+        ]);
+
+        // A (0,0) -> (9,3) = (3,1)
+        let p1 = Point::new(3,0);
+        let p2 = Point::new(2,1);
+        let p3 = Point::new(1,2);
+        let p4 = Point::new(2,2);
+        assert_eq!(Some(&2), find_asteroid_counts(&asteroids).get(&p1));
+        assert_eq!(Some(&3), find_asteroid_counts(&asteroids).get(&p2));
+        assert_eq!(Some(&2), find_asteroid_counts(&asteroids).get(&p3));
+        assert_eq!(Some(&3), find_asteroid_counts(&asteroids).get(&p4));
+    }
 
     // TODO: Most below here are failing
 
@@ -547,10 +693,51 @@ mod test {
             String::from("###.##.####.##.#..##"),
         ];
 
-        let p = Point::new(6, 3);
-        assert_eq!((p, 41), find_best_asteroid(input));
+        let p = Point::new(11, 13);
+        assert_eq!((p, 210), find_best_asteroid(input));
     }
 
+    #[test]
+    fn test_angle_metric() {
+
+        // .#....###24...#..
+        // ##...##.13#67..9#
+        // ##...#...5.8####.
+        // ..#.....X...###..
+        // ..#.#.....#....##
+        let X = Point::new(8,3);
+        let p_1 = Point::new(8, 1);
+        let p_2 = Point::new(9, 0);
+        let p_3 = Point::new(9, 1);
+        let p_4 = Point::new(10, 0);
+        let p_5 = Point::new(9, 2);
+        let p_6 = Point::new(11, 1);
+        let p_7 = Point::new(12, 1);
+
+        // Next quadrant
+        let p_8 = Point::new(12, 3);
+        let p_9 = Point::new(10, 4);
+
+        // Next quadrant
+        let p_10 = Point::new(4, 4);
+
+        // Last quadrant
+        let p_11 = Point::new(7, 0);
+
+        println!("{}", X.angle_metric(&p_1));
+        println!("{}", X.angle_metric(&p_2));
+        println!("{}", X.angle_metric(&p_3));
+        println!("{}", X.angle_metric(&p_4));
+        println!("{}", X.angle_metric(&p_5));
+        println!("{}", X.angle_metric(&p_6));
+        println!("{}", X.angle_metric(&p_7));
+        println!("{}", X.angle_metric(&p_8));
+
+        println!("{}", X.angle_metric(&p_9));
+        println!("{}", X.angle_metric(&p_10));
+        println!("{}", X.angle_metric(&p_11));
+        assert!(false);
+    }
 
 
 }

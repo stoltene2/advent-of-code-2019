@@ -5,6 +5,7 @@ let
     pkgs.rustc
     pkgs.cargo
     pkgs.rustfmt
+    pkgs.rls
   ];
 in
 pkgs.stdenv.mkDerivation {
