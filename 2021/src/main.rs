@@ -1,41 +1,47 @@
-use std::iter::Zip;
+fn increasing_depths_count(v: &Vec<(&i64, &i64)>) -> i64 {
+    v.iter().fold(0, |acc, pair| {
+        if pair.0 < pair.1 {
+            return acc + 1;
+        }
+
+        acc
+    })
+}
 
 fn main() {
-    let test_v1: Vec<u64> = vec![199, 200, 208, 210, 200, 207, 240, 269, 260, 263];
-    let test_v2: Vec<u64> = test_v1[1..].to_vec();
+    let test_v1: Vec<i64> = vec![199, 200, 208, 210, 200, 207, 240, 269, 260, 263];
+    let test_v2: Vec<i64> = test_v1[1..].to_vec();
 
-    let z = test_v1.iter().zip(&test_v2);
+    let z: Vec<(&i64, &i64)> = test_v1.iter().zip(&test_v2).collect();
+    let r = increasing_depths_count(&z);
 
-    let r = z.fold(0, |acc, pair| {
-        if pair.0 < pair.1 {
-            return acc + 1;
-        }
+    println!("Test Data: {}", r);
+    assert_eq!(r, 7);
 
-        acc
-    });
+    //////////////////////////////
 
-    println!("{}", r);
+    let input = depths_input();
+    let d1 = vec_as_pairs(&input);
+    let r = increasing_depths_count(&d1);
 
-    let d1 = pairs(depths());
-
-    let r = d1.iter().fold(0, |acc, pair| {
-        if pair.0 < pair.1 {
-            return acc + 1;
-        }
-
-        acc
-    });
-
-    assert_eq!(r, 1448);
     println!("Solution: {}", r);
+    assert_eq!(r, 1448);
+
+    //////////////////////////////
+
+    let sums_of_triples: Vec<i64> = depths_input().windows(3).map(|w| w.iter().sum()).collect();
+    let part2_result = increasing_depths_count(&vec_as_pairs(&sums_of_triples));
+
+    println!("part2_result: {}", part2_result);
+    assert_eq!(part2_result, 1471);
 }
 
-fn pairs(ds: Vec<u64>) -> Vec<(u64, u64)> {
-    let ds2 = ds[1..].to_vec().into_iter();
-    ds.into_iter().zip(ds2).collect()
+fn vec_as_pairs(ds: &Vec<i64>) -> Vec<(&i64, &i64)> {
+    let ds2 = ds[1..].iter();
+    ds.iter().zip(ds2).collect::<Vec<(&i64, &i64)>>()
 }
 
-fn depths() -> Vec<u64> {
+fn depths_input() -> Vec<i64> {
     vec![
         109, 117, 118, 98, 102, 94, 101, 109, 121, 126, 117, 116, 134, 119, 98, 97, 96, 98, 101,
         107, 123, 134, 137, 160, 171, 188, 189, 188, 169, 163, 182, 184, 187, 184, 196, 199, 218,
