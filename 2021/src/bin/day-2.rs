@@ -1,3 +1,42 @@
+type Position = (i64, i64);
+
+#[derive(Debug)]
+struct State {
+    pos: Position,
+    aim: i64,
+}
+
+impl State {
+    fn new() -> State {
+        State {
+            pos: (0, 0),
+            aim: 0,
+        }
+    }
+
+    fn update(&self, command: &(i64, i64)) -> State {
+        match command {
+            (x, 0) => {
+                let new_x = self.pos.0 + x;
+                let new_y = self.pos.1 + self.aim * x;
+                State {
+                    pos: (new_x, new_y),
+                    aim: self.aim,
+                }
+            }
+            (0, y) => State {
+                pos: self.pos,
+                aim: self.aim + y,
+            },
+            (_, _) => panic!("Invalid case"),
+        }
+    }
+
+    fn result(&self) -> i64 {
+        self.pos.0 * self.pos.1
+    }
+}
+
 fn main() {
     let headings: Vec<(i64, i64)> = vec![(5, 0), (0, 5), (8, 0), (0, -3), (0, 8), (2, 0)];
 
@@ -14,8 +53,24 @@ fn main() {
         .fold((0, 0), |(x_0, y_0), (x, y)| (x_0 + x, y_0 + y));
 
     let result = position.0 * position.1;
+
     println!("Part 1 result: {}", result);
     assert_eq!(result, 1962940);
+
+    //// Part 2 //////////////////
+
+    let state: State = headings
+        .iter()
+        .fold(State::new(), |state: State, command| state.update(command));
+
+    assert_eq!(state.result(), 900);
+
+    let state: State = problem_1_input()
+        .iter()
+        .fold(State::new(), |state: State, command| state.update(command));
+
+    println!("Part 2 result: {}", state.result());
+    assert_eq!(state.result(), 1813664422);
 }
 
 /*
