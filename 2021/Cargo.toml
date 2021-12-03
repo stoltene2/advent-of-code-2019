@@ -1,5 +1,5 @@
 [package]
-name = "aoc-2021"
+name = "aoc"
 version = "0.1.0"
 edition = "2018"
 
@@ -7,6 +7,11 @@ edition = "2018"
 
 [[bin]]
 name = "day-2"
+test = true
+bench = false
+
+[[bin]]
+name = "day-3"
 test = true
 bench = false
 
