@@ -1,9 +1,9 @@
 fn main() {
     println!("Hello there");
 
-    let sample_input: Vec<u8> = vec![3, 4, 3, 1, 2];
+    let sample_input: Vec<u64> = vec![3, 4, 3, 1, 2];
 
-    let mut result: Vec<u8> = sample_input.clone();
+    let mut result: Vec<u64> = sample_input.clone();
 
     for _i in 1..=80 {
         result = next_generation(result);
@@ -22,41 +22,50 @@ fn main() {
     assert_eq!(380612, result.len());
 
     //Problem 2
-    let mut result = input();
+    let mut result = build_model(input());
 
-    for i in 1..=256 {
-        if i % 10 == 0 {
-            println!("Iteration: {}", i);
-        }
-
-        result = next_generation(result);
+    for _i in 1..=256 {
+        result = next_generation_p2(result);
     }
 
-    println!("Solution 2: {}", result.len());
-    //       assert_eq!(380612, result.len());
+    let answer: u64 = result.iter().fold(0, |acc, val| acc + val);
+    println!("Solution 2: {:?}", answer);
+    assert_eq!(1710166656900, answer);
 }
 
-fn next_generation(current: Vec<u8>) -> Vec<u8> {
-    let mut next_generation: Vec<u8>;
-    let mut new_lanternfish: Vec<u8> = Vec::with_capacity(current.len());
+fn next_generation(mut current: Vec<u64>) -> Vec<u64> {
+    for i in 0..current.len() {
+        if current[i] != 0 {
+            current[i] = current[i] - 1;
+        } else {
+            current.push(8);
+            current[i] = 6;
+        }
+    }
+    current
+}
 
-    next_generation = current
-        .iter()
-        .map(|fish| {
-            if *fish != 0 {
-                *fish - 1
-            } else {
-                new_lanternfish.push(8);
-                6
-            }
+fn next_generation_p2(mut current: [u64; 9]) -> [u64; 9] {
+    let spawns = current[0];
+
+    for i in 0..8 {
+        current[i] = current[i + 1];
+    }
+
+    current[6] += spawns;
+    current[8] = spawns;
+    current
+}
+
+fn build_model(data: Vec<u64>) -> [u64; 9] {
+    data.iter()
+        .fold([0, 0, 0, 0, 0, 0, 0, 0, 0], |mut res, days| {
+            res[*days as usize] += 1;
+            res
         })
-        .collect();
-
-    next_generation.append(&mut new_lanternfish);
-    next_generation
 }
 
-fn input() -> Vec<u8> {
+fn input() -> Vec<u64> {
     vec![
         3, 1, 4, 2, 1, 1, 1, 1, 1, 1, 1, 4, 1, 4, 1, 2, 1, 1, 2, 1, 3, 4, 5, 1, 1, 4, 1, 3, 3, 1,
         1, 1, 1, 3, 3, 1, 3, 3, 1, 5, 5, 1, 1, 3, 1, 1, 2, 1, 1, 1, 3, 1, 4, 3, 2, 1, 4, 3, 3, 1,
