@@ -1,6 +1,121 @@
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 
+fn solve(data: [&str; 10], display: [&str; 4]) -> i32 {
+    // todo: Maybe data should be appended with display
+
+    let i: Vec<HashSet<char>> = data.iter().map(|s| HashSet::from_iter(s.chars())).collect();
+
+    let display: Vec<HashSet<char>> = display
+        .iter()
+        .map(|s| HashSet::from_iter(s.chars()))
+        .collect();
+
+    let mut h = HashMap::new();
+
+    for segments in &i {
+        match segments.len() {
+            2 => h.insert(1, segments),
+            3 => h.insert(7, segments),
+            4 => h.insert(4, segments),
+            7 => h.insert(8, segments),
+            _ => None,
+        };
+    }
+
+    // Six, Nine, and Zero have 6 segments and their intersection with
+    // 1 and 4 uniquely identifies the number by how many segments
+    // remain.
+    let six = &i
+        .iter()
+        .find(|x| x.len() == 6 && (x.intersection(&h[&1]).collect::<Vec<_>>().len() == 1))
+        .unwrap();
+    h.insert(6, six);
+
+    let nine = &i
+        .iter()
+        .find(|x| x.len() == 6 && (x.difference(&h[&4]).collect::<Vec<_>>().len() == 2))
+        .unwrap();
+
+    h.insert(9, nine);
+
+    // There are only 3 numbers of size 6, we've found two so set zero as the third
+    let zero = &i
+        .iter()
+        .find(|x| x.len() == 6 && !x.eq(six) && !x.eq(nine))
+        .unwrap();
+
+    h.insert(0, zero);
+
+    // Three, two, and five have 5 segments and we can intersect or
+    // difference and check remaining segments to identify three and
+    // two. Five is a little tricker (because I'm tired.) I ended up
+    // fighting the borrow checker while attempting to us a difference
+    // and chain with another intersection.
+
+    // My error was
+    /*
+    error[E0308]: mismatched types
+      --> src/bin/day-8.rs:67:47
+       |
+    67 |             x.len() == 5 && diff.intersection(*one).collect::<Vec<_>>().len() == 1
+       |                                               ^^^^ expected `&char`, found `char`
+       |
+       = note: expected reference `&HashSet<&char>`
+                  found reference `&HashSet<char>`
+
+    For more information about this error, try `rustc --explain E0308`.
+     */
+    let three = &i
+        .iter()
+        .find(|x| x.len() == 5 && x.intersection(&h[&1]).collect::<Vec<_>>().len() == 2)
+        .unwrap();
+
+    h.insert(3, three);
+
+    // I messed with two and 5
+    let two = &i
+        .iter()
+        .find(|x| x.len() == 5 && x.difference(nine).collect::<Vec<_>>().len() == 1)
+        .unwrap();
+
+    h.insert(2, two);
+
+    let five = &i
+        .iter()
+        .find(|x| {
+            x.len() == 5
+                && six.difference(x).collect::<Vec<_>>().len() == 1
+                && x.difference(three).collect::<Vec<_>>().len() == 1
+        })
+        .unwrap();
+
+    h.insert(5, five);
+
+    assert_eq!(&10, &h.len());
+    assert_eq!(&4, &display.len());
+
+    display
+        .iter()
+        .rev()
+        .enumerate()
+        .map(|(idx, v)| {
+            // panic here
+            let p = h.iter().find(|(num, set)| set.eq(&&v));
+            match p {
+                Some((n, _)) => return n * 10_i32.pow(idx as u32),
+                None => {
+                    println!(
+                        "\nError!!!!!\nInput:{:?}\n{:?}\nDisplay{:?}\n",
+                        &data, &h, &display
+                    );
+                    return 0;
+                }
+            }
+        })
+        .sum::<i32>()
+}
+
 fn main() {
     let i = input();
 
@@ -19,107 +134,14 @@ fn main() {
 
     // Part 2
 
-    // let mut h = HashSet::new();
-    // h.insert('b');
-    // h.insert('e');
-
-    // let mut i = HashSet::new();
-    // i.insert('b');
-    // i.insert('e');
-
-    // assert!(h.eq(&i));
-
-    // let mut chrs = HashSet::new();
-    // for c in "foo".chars() {
-    //     chrs.insert(c);
-    // }
-
-    // println!("{:?}, |chrs|={}", &chrs, &chrs.len());
-
     let data = test_input();
+    let result = solve(data[0].0, data[0].1);
+    println!("Result: {}", result);
 
-    // Make vector of Sets of characters
+    let data = input();
 
-    // TODO:  Might be able to do HashSet::from("foo");
-    let mut i: Vec<HashSet<char>> = data[0]
-        .0
-        .iter()
-        .map(|s| {
-            HashSet::from_iter(s.chars())
-        })
-        .collect();
-
-    let display: Vec<HashSet<char>> = data[1]
-        .0
-        .iter()
-        .map(|s| {
-            HashSet::from_iter(s.chars())
-        })
-        .collect();
-
-
-    let mut h = HashMap::new();
-
-    for segments in &i {
-        match segments.len() {
-            2 => h.insert(1, segments),
-            3 => h.insert(7, segments),
-            4 => h.insert(4, segments),
-            7 => h.insert(8, segments),
-            _ => None,
-        };
-    }
-
-    let six = &i
-        .iter()
-        .find(|x| x.len() == 6 && (x.intersection(&h[&1]).collect::<Vec<_>>().len() == 1))
-        .unwrap();
-    h.insert(6, six);
-
-    let nine = &i
-        .iter()
-        .find(|x| x.len() == 6 && (x.difference(&h[&4]).collect::<Vec<_>>().len() == 2))
-        .unwrap();
-
-    h.insert(9, nine);
-
-    let zero = &i
-        .iter()
-        .find(|x| x.len() == 6 && !x.eq(six) && !x.eq(nine))
-        .unwrap();
-
-    h.insert(0, zero);
-
-    let three = &i
-        .iter()
-        .find(|x| x.len() == 5 && x.intersection(&h[&1]).collect::<Vec<_>>().len() == 2)
-        .unwrap();
-
-    h.insert(3, three);
-
-    let two = &i
-        .iter()
-        .find(|x| x.len() == 5 && x.intersection(&h[&4]).collect::<Vec<_>>().len() == 2)
-        .unwrap();
-
-    h.insert(2, two);
-
-    let five = &i
-        .iter()
-        .find(|x| x.len() == 5 && x.intersection(&h[&4]).collect::<Vec<_>>().len() == 3)
-        .unwrap();
-
-    h.insert(5, five);
-
-
-    let mut sum: i32 = 0;
-    for (k,v) in &h {
-        sum = sum + display.iter().map(|n| if n.eq(v) {*k} else {0}).sum::<i32>();
-    }
-
-    println!("{:?}", &h);
-    println!("h.len() {}", &h.len());
-    println!("sum: {}", sum);
+    let result: i32 = data.iter().map(|data| solve(data.0, data.1)).sum();
+    println!("input: {}", result);
 }
 
 #[allow(dead_code)]
