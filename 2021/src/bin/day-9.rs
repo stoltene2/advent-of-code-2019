@@ -1,4 +1,8 @@
+use ::std::collections::{HashMap, HashSet};
+use std::{borrow::Borrow, cell::RefCell, rc::Rc};
+
 type Ocean = Vec<Vec<i32>>;
+type Basins = HashMap<(i32, i32), Rc<RefCell<HashSet<(i32, i32)>>>>;
 
 fn main() {
     let data = input();
@@ -11,6 +15,137 @@ fn main() {
     }
 
     println!("Result: {}", &sum);
+    assert_eq!(&436, &sum);
+
+    let mut hs: HashMap<(i32, i32), &Vec<(i32, i32)>> = HashMap::new();
+
+    /*
+    1. Go through each point
+      - If point value is less than 9
+        then
+          add point to HashSet and attach HashSet
+          to the key (i,j)
+
+        else
+          Add an empty HashSet because the value is 9
+
+
+    2. Traverse through the data input.
+
+       Grab the RefCell from location (i, j)
+
+       Get the RefCell hash from above.
+         - If cell is a 9, return None
+         - mutate hash, h, from above to include (i, j)
+         - Set the refcell at (i,j) to h
+
+       Get the refcell from the left
+         - If cell is a 9, return None
+         - merge hash, h_new, at (i, j) with (i-1, j)
+         - set h_new to (i,j) and (i-1, j)
+
+       At this point we should have a connection
+
+    3. Unique all the HashSets and sort by size.
+    4. Look up the sum for a collection of points
+     */
+
+    let mut locs: Basins = HashMap::new();
+
+    for y in 0..100 {
+        for x in 0..100 {
+            if data[y][x] < 9 {
+                let mut h: HashSet<(i32, i32)> = HashSet::new();
+                h.insert((x as i32, y as i32));
+                locs.insert((x as i32, y as i32), Rc::new(RefCell::new(h)));
+            } else {
+                locs.insert((x as i32, y as i32), Rc::new(RefCell::new(HashSet::new())));
+            }
+        }
+    }
+
+    // if let Some(b) = get_basin(&data, &locs, 0, 100) {
+    //     panic!("No way");
+    // } else {
+    //     println!("Cool, no errors");
+    // }
+
+    // TODO: Print out (0,0), (1,0), (1,1)
+
+    // If considering (1, 0) then look at (00)
+    if let Some(r) = get_basin(&data, &locs, 0, 0) {
+        let mut local = r.borrow_mut();
+        local.insert((1, 0));
+    }
+
+    // Copy refcell to another slot by grabbing on e to left and inserting at (1,0)
+    if let Some(r) = &locs.get(&(0, 0)) {
+        locs.insert((1, 0), Rc::clone(&r));
+    }
+
+    if let Some(r) = &locs.get(&(1, 1)) {
+        let left = locs.get(&(1, 0)).unwrap().take();
+
+        // .cloned() was the key to dealing with Union type or HashSet<&(i32, i32)>
+        // updates (1,1) in place
+        let merged: HashSet<(i32, i32)> = r.borrow_mut().union(&left).cloned().collect();
+
+        // Update Rc to the left and update any other references that pointed to it
+        if let Some(left) = locs.get_mut(&(1, 0)) {
+            left.replace(merged);
+        }
+    }
+
+    // TODO: Put this above in a formal loop using `get_basin`
+    // Need to get straight with `take` from RefCell and `borrow_mut` from Rc
+
+    // Test here
+    if let Some(r) = &locs.get(&(1, 0)) {
+        println!("ex should see 3 values: {:?}", r);
+    }
+}
+
+fn grow_basin<'a>(ocean: &Ocean, basins: &mut Basins, x: i32, y: i32) -> () {
+    // Add (x,y) to HashSet above if it is a valid spot
+    if let Some(r) = get_basin(&ocean, &basins, x, y - 1) {
+        let mut above = r.borrow_mut();
+        above.insert((x, y));
+    }
+
+    // Replace current basin at (x,y) with the updated above it
+    if let Some(r) = &basins.get(&(x, y - 1)) {
+        basins.insert((x, y), Rc::clone(&r));
+    }
+
+    if let Some(r) = &basins.get(&(x, y)) {
+        let left = basins.get(&(x - 1, y)).unwrap().take();
+
+        // .cloned() was the key to dealing with Union type or HashSet<&(i32, i32)>
+        // updates (1,1) in place
+        let merged: HashSet<(i32, i32)> = r.borrow_mut().union(&left).cloned().collect();
+
+        // Update Rc to the left and update any other references that pointed to it
+        if let Some(left) = basins.get_mut(&(x - 1, y)) {
+            left.replace(merged);
+        }
+    }
+}
+
+fn get_basin<'a>(
+    ocean: &Ocean,
+    basins: &'a Basins,
+    x: i32,
+    y: i32,
+) -> Option<&'a Rc<RefCell<HashSet<(i32, i32)>>>> {
+    if x < 0 || y < 0 || x >= 100 || y >= 100 {
+        return None;
+    }
+
+    if ocean[y as usize][x as usize] >= 9 {
+        return None;
+    }
+
+    basins.get(&(x, y))
 }
 
 fn minimal_sum(data: &Ocean, x: i32, y: i32) -> i32 {
