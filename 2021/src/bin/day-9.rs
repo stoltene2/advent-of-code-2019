@@ -1,8 +1,10 @@
 use ::std::collections::{HashMap, HashSet};
-use std::{borrow::Borrow, cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 type Ocean = Vec<Vec<i32>>;
 type Basins = HashMap<(i32, i32), Rc<RefCell<HashSet<(i32, i32)>>>>;
+
+type Point = (i32, i32);
 
 fn main() {
     let data = input();
@@ -17,94 +19,84 @@ fn main() {
     println!("Result: {}", &sum);
     assert_eq!(&436, &sum);
 
-    let mut hs: HashMap<(i32, i32), &Vec<(i32, i32)>> = HashMap::new();
-
-    /*
-    1. Go through each point
-      - If point value is less than 9
-        then
-          add point to HashSet and attach HashSet
-          to the key (i,j)
-
-        else
-          Add an empty HashSet because the value is 9
-
-
-    2. Traverse through the data input.
-
-       Grab the RefCell from location (i, j)
-
-       Get the RefCell hash from above.
-         - If cell is a 9, return None
-         - mutate hash, h, from above to include (i, j)
-         - Set the refcell at (i,j) to h
-
-       Get the refcell from the left
-         - If cell is a 9, return None
-         - merge hash, h_new, at (i, j) with (i-1, j)
-         - set h_new to (i,j) and (i-1, j)
-
-       At this point we should have a connection
-
-    3. Unique all the HashSets and sort by size.
-    4. Look up the sum for a collection of points
-     */
-
-    let mut locs: Basins = HashMap::new();
+    let mut points: HashSet<Point> = HashSet::with_capacity(100 * 100);
 
     for y in 0..100 {
         for x in 0..100 {
             if data[y][x] < 9 {
-                let mut h: HashSet<(i32, i32)> = HashSet::new();
-                h.insert((x as i32, y as i32));
-                locs.insert((x as i32, y as i32), Rc::new(RefCell::new(h)));
-            } else {
-                locs.insert((x as i32, y as i32), Rc::new(RefCell::new(HashSet::new())));
+                points.insert((x as i32, y as i32));
             }
         }
     }
 
-    // if let Some(b) = get_basin(&data, &locs, 0, 100) {
-    //     panic!("No way");
-    // } else {
-    //     println!("Cool, no errors");
-    // }
+    let mut sizes: Vec<usize> = Vec::with_capacity(100 * 100);
 
-    // TODO: Print out (0,0), (1,0), (1,1)
+    while points.len() > 0 {
+        let p: Point = points.iter().take(1).collect::<Vec<_>>()[0].clone();
 
-    // If considering (1, 0) then look at (00)
-    if let Some(r) = get_basin(&data, &locs, 0, 0) {
-        let mut local = r.borrow_mut();
-        local.insert((1, 0));
+        let result = find_basin(points, &p);
+
+        points = result.1;
+        sizes.push(result.0);
     }
 
-    // Copy refcell to another slot by grabbing on e to left and inserting at (1,0)
-    if let Some(r) = &locs.get(&(0, 0)) {
-        locs.insert((1, 0), Rc::clone(&r));
-    }
-
-    if let Some(r) = &locs.get(&(1, 1)) {
-        let left = locs.get(&(1, 0)).unwrap().take();
-
-        // .cloned() was the key to dealing with Union type or HashSet<&(i32, i32)>
-        // updates (1,1) in place
-        let merged: HashSet<(i32, i32)> = r.borrow_mut().union(&left).cloned().collect();
-
-        // Update Rc to the left and update any other references that pointed to it
-        if let Some(left) = locs.get_mut(&(1, 0)) {
-            left.replace(merged);
-        }
-    }
-
-    // TODO: Put this above in a formal loop using `get_basin`
-    // Need to get straight with `take` from RefCell and `borrow_mut` from Rc
-
-    // Test here
-    if let Some(r) = &locs.get(&(1, 0)) {
-        println!("ex should see 3 values: {:?}", r);
-    }
+    sizes.sort();
+    let final_result: usize = sizes.iter().rev().take(3).product();
+    assert_eq!(1317792, final_result);
+    println!("Final result {:?}", final_result);
 }
 
+// This function works by taking a collection of points to search
+// through. It then explores that set starting at `p`. It keeps track
+// of points to explore next. When a point is explored it is removed
+// from `points` and the total is incremented.
+fn find_basin(mut points: HashSet<Point>, p: &Point) -> (usize, HashSet<Point>) {
+    let mut to_explore: HashSet<Point> = HashSet::with_capacity(4);
+    let mut total_explored: usize = 0;
+
+    to_explore.insert(*p);
+    points.remove(&p);
+
+    while to_explore.len() > 0 {
+        let next_ps: Vec<Point> = to_explore.iter().take(1).cloned().collect();
+        let next_p = next_ps[0];
+
+        to_explore.remove(&next_p);
+        total_explored += 1;
+
+        let surrounding = get_surrounding(&points, &next_p);
+
+        points = points.difference(&surrounding).cloned().collect();
+        to_explore = to_explore.union(&surrounding).cloned().collect();
+    }
+
+    (total_explored, points)
+}
+
+fn get_surrounding(points: &HashSet<Point>, p: &Point) -> HashSet<Point> {
+    let mut surrounding = HashSet::with_capacity(4);
+
+    if let Some(m) = points.get(&(p.0 - 1, p.1)) {
+        surrounding.insert(m.clone());
+    }
+
+    if let Some(m) = points.get(&(p.0 + 1, p.1)) {
+        surrounding.insert(m.clone());
+    }
+
+    if let Some(m) = points.get(&(p.0, p.1 - 1)) {
+        surrounding.insert(m.clone());
+    }
+
+    if let Some(m) = points.get(&(p.0, p.1 + 1)) {
+        surrounding.insert(m.clone());
+    }
+
+    surrounding
+}
+
+#[allow(dead_code)]
+#[allow(mutable_borrow_reservation_conflict)]
 fn grow_basin<'a>(ocean: &Ocean, basins: &mut Basins, x: i32, y: i32) -> () {
     // Add (x,y) to HashSet above if it is a valid spot
     if let Some(r) = get_basin(&ocean, &basins, x, y - 1) {
@@ -131,6 +123,7 @@ fn grow_basin<'a>(ocean: &Ocean, basins: &mut Basins, x: i32, y: i32) -> () {
     }
 }
 
+#[allow(dead_code)]
 fn get_basin<'a>(
     ocean: &Ocean,
     basins: &'a Basins,
