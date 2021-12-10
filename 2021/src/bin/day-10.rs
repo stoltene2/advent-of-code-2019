@@ -14,18 +14,49 @@ fn main() {
 
     let test_result = test_input
         .iter()
-        .fold(0, |total, input| total + score_syntax(input));
+        .fold(0, |total, input| total + score_syntax(input).0);
 
     assert_eq!(26397, test_result);
 
     let result = input()
         .iter()
-        .fold(0, |total, input| total + score_syntax(input));
+        .fold(0, |total, input| total + score_syntax(input).0);
 
     println!("result: {}", result);
+
+    // Part 2 test data
+    let pt2_test_string = "<{([{{}}[<[[[<>{}]]]>[]]";
+    let (_, stack) = score_syntax(pt2_test_string);
+    let needed_to_complete: Vec<_> = stack
+        .iter()
+        .rev()
+        .map(|bracket| get_pair(*bracket))
+        .collect();
+
+    let result = needed_to_complete.iter().fold(0, |total, bracket| {
+        let t = total * 5;
+        let score = score_auto_complete_bracket(*bracket);
+        t + score
+    });
+
+    assert_eq!(&294, &result);
+
+    // Part 2 solution
+    let mut auto_complete_scores: Vec<_> = input().iter().map(|s| score_auto_complete(s)).collect();
+    auto_complete_scores.sort();
+
+    auto_complete_scores = auto_complete_scores
+        .iter()
+        .filter(|x| *x != &0_usize)
+        .cloned()
+        .collect();
+
+    let middle_score = auto_complete_scores[auto_complete_scores.len() / 2];
+    assert_eq!(3654963618, middle_score);
+    println!("Solution 2, middle_score:{}", middle_score);
 }
 
-fn score_syntax(input: &str) -> usize {
+fn score_syntax(input: &str) -> (usize, Vec<char>) {
     let mut stack: Vec<char> = Vec::new();
     for bracket in input.chars() {
         match bracket {
@@ -34,15 +65,11 @@ fn score_syntax(input: &str) -> usize {
             }
             '}' | ']' | ')' | '>' => {
                 if let Some(last_bracket) = stack.last() {
-                    if *last_bracket == is_pair(bracket) {
+                    if *last_bracket == get_pair(bracket) {
                         stack.pop();
                     } else {
-                        return score(bracket);
-                        // println!(
-                        //     "Oops, expected: {} but found {}",
-                        //     is_pair(*last_bracket),
-                        //     bracket
-                        // );
+                        // Return an empty stack because it isn't fixable here
+                        return (score_syntax_error(bracket), Vec::new());
                     }
                 }
             }
@@ -52,13 +79,44 @@ fn score_syntax(input: &str) -> usize {
 
     // incomplete input
     if stack.len() > 0 {
+        return (0, stack);
+    }
+
+    // If we've gotten here there is an error
+    (0, Vec::new())
+}
+
+fn score_auto_complete(input: &str) -> usize {
+    let (n, stack) = score_syntax(input);
+
+    if n > 0 {
         return 0;
     }
 
-    0
+    let needed_to_complete: Vec<_> = stack
+        .iter()
+        .rev()
+        .map(|bracket| get_pair(*bracket))
+        .collect();
+
+    needed_to_complete.iter().fold(0, |total, bracket| {
+        let t = total * 5;
+        let score = score_auto_complete_bracket(*bracket);
+        t + score
+    })
 }
 
-fn score(bracket: char) -> usize {
+fn score_auto_complete_bracket(bracket: char) -> usize {
+    match bracket {
+        ']' => 2,
+        '>' => 4,
+        ')' => 1,
+        '}' => 3,
+        _ => 0,
+    }
+}
+
+fn score_syntax_error(bracket: char) -> usize {
     match bracket {
         ']' => 57,
         '>' => 25137,
@@ -68,7 +126,7 @@ fn score(bracket: char) -> usize {
     }
 }
 
-fn is_pair(bracket: char) -> char {
+fn get_pair(bracket: char) -> char {
     match bracket {
         '{' => '}',
         '(' => ')',
