@@ -15,4 +15,49 @@ name = "day-3"
 test = true
 bench = false
 
+[[bin]]
+name = "day-4-1"
+test = true
+bench = false
+
+[[bin]]
+name = "day-4-2"
+test = true
+bench = false
+
+[[bin]]
+name = "day-5-1"
+test = true
+bench = false
+
+[[bin]]
+name = "day-5-2"
+test = true
+bench = false
+
+[[bin]]
+name = "day-6"
+test = true
+bench = false
+
+[[bin]]
+name = "day-7"
+test = true
+bench = false
+
+[[bin]]
+name = "day-8"
+test = true
+bench = false
+
+[[bin]]
+name = "day-9"
+test = true
+bench = false
+
+[[bin]]
+name = "day-10"
+test = true
+bench = false
+
 [dependencies]

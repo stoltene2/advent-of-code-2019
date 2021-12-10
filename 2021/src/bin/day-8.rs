@@ -65,6 +65,8 @@ fn solve(data: [&str; 10], display: [&str; 4]) -> i32 {
                   found reference `&HashSet<char>`
 
     For more information about this error, try `rustc --explain E0308`.
+
+    12/09 - I found out that I can use `.copied()` here.
      */
     let three = &i
         .iter()
@@ -101,7 +103,7 @@ fn solve(data: [&str; 10], display: [&str; 4]) -> i32 {
         .enumerate()
         .map(|(idx, v)| {
             // panic here
-            let p = h.iter().find(|(num, set)| set.eq(&&v));
+            let p = h.iter().find(|(_num, set)| set.eq(&&v));
             match p {
                 Some((n, _)) => return n * 10_i32.pow(idx as u32),
                 None => {
