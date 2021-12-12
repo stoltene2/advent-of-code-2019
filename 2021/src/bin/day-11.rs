@@ -16,7 +16,7 @@ fn main() {
     // else
     //    incease p+1
 
-    let test_input = vec![
+    let _test_input = vec![
         vec![1, 1, 1, 1, 1],
         vec![1, 9, 9, 9, 1],
         vec![1, 9, 1, 9, 1],
@@ -27,7 +27,7 @@ fn main() {
     let mut total: i32 = 0;
 
     let mut result = input().clone();
-    for _i in 0..99 {
+    for _i in 1..100 {
         let r = cycle(result);
 
         total += r.0;
@@ -35,7 +35,24 @@ fn main() {
         result = r.1;
     }
 
+    assert_eq!(1697, total);
+
     println!("ocean: {:?}\ntotal: {}", &result, &total);
+
+    // Iterate until all octopuses are 0
+    let mut result = input().clone();
+    for i in 1.. {
+        let r = cycle(result);
+        result = r.1;
+
+        let all_zeros = result.iter().all(|rows| rows.iter().all(|x| *x == 0));
+
+        if all_zeros {
+            println!("Solution 2: {}", i);
+            assert_eq!(344, i);
+            break;
+        }
+    }
 }
 
 fn cycle(data: Vec<Vec<u8>>) -> (i32, Vec<Vec<u8>>) {
