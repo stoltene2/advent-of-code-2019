@@ -20,12 +20,37 @@ fn main() {
 
     let g = build_graph(input());
 
-    let t = explore_p1(&g, &"start", HashSet::new());
+    //let t = explore_p2(&g, &"start", HashSet::new());
+
+    let total_of_single_visits = explore_p1(&g, &"start", HashSet::new());
+
+    println!("{:?}", two_visits_allowed(&g));
+
+    let total_of_two_visits = two_visits_allowed(&g)
+        .iter()
+        .fold(0, |total, multi_visit_node| {
+            total + explore_p2(&g, &"start", HashSet::new(), (multi_visit_node, 0))
+        });
 
     //    println!("graph: {:?}", &g);
-    println!("size: {}", &t);
+    println!(
+        "size: {}, single visit: {}, double visit: {}",
+        &total_of_single_visits + &total_of_two_visits,
+        &total_of_single_visits,
+        &total_of_two_visits
+    );
+
+    //todo check in pt 1
 }
 
+fn two_visits_allowed(g: &Graph) -> Vec<Node> {
+    g.keys()
+        .filter(|node| *node != &"start" && *node != &"end" && is_small_cave(node))
+        .cloned()
+        .collect()
+}
+
+///Calculates paths when small caves are not allowed to be visited
 fn explore_p1(g: &Graph, node: &Node, mut visited: HashSet<Node>) -> i32 {
     if is_small_cave(&node) {
         visited.insert(node);
@@ -47,8 +72,47 @@ fn explore_p1(g: &Graph, node: &Node, mut visited: HashSet<Node>) -> i32 {
             total + explore_p1(g, &next_node, visited.clone())
         });
     }
+}
 
-    // do it
+/// Calculates all paths where a single small cave must be visited twice
+fn explore_p2(
+    g: &Graph,
+    node: &Node,
+    mut visited: HashSet<Node>,
+    (multi_visit_node, visits): (&Node, i32),
+) -> i32 {
+    if node == &"end" {
+        if visits >= 2 {
+            return 1;
+        } else {
+            return 0;
+        }
+    }
+
+    if is_small_cave(&node) {
+        if node == multi_visit_node && visits >= 2 {
+            visited.insert(node);
+        } else if node != multi_visit_node {
+            visited.insert(node);
+        }
+    }
+
+    let to_visit: HashSet<Node> = neighbors(&g, &node).difference(&visited).cloned().collect();
+
+    if to_visit.is_empty() {
+        return 0;
+    } else {
+        return to_visit.iter().fold(0, |total, next_node| {
+            //todo update visits
+            let v = if next_node == multi_visit_node {
+                visits + 1
+            } else {
+                visits
+            };
+
+            total + explore_p2(g, &next_node, visited.clone(), (multi_visit_node, v))
+        });
+    }
 }
 
 /// lists all nodes connected to `Node` inside of `g`
