@@ -6,14 +6,22 @@ enum Packet {
         version: usize,
         value: usize,
     },
-    OperatorFixedSize {
+    Operator {
         version: usize,
         sub_packets: Vec<Packet>,
+        operator: Op,
     },
-    OperatorFixedCount {
-        version: usize,
-        sub_packets: Vec<Packet>,
-    },
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum Op {
+    Sum,
+    Product,
+    Min,
+    Max,
+    Gt,
+    Lt,
+    Eq,
 }
 
 const LITERAL: usize = 4;
@@ -22,26 +30,62 @@ impl Packet {
     fn sum_versions(&self) -> usize {
         match self {
             Packet::Literal { version, value: _ } => *version,
-            Self::OperatorFixedSize {
+            Packet::Operator {
                 version,
                 sub_packets,
-            } => {
-                let sub_packet_total: usize = sub_packets.iter().map(|p| p.sum_versions()).sum();
-                *version + sub_packet_total
-            }
-            Self::OperatorFixedCount {
-                version,
-                sub_packets,
+                operator: _,
             } => {
                 let sub_packet_total: usize = sub_packets.iter().map(|p| p.sum_versions()).sum();
                 *version + sub_packet_total
             }
         }
     }
-    fn parse(mut s: Bits) -> (Packet, Bits) {
-        // print!("Parsing: ");
-        // pp_bits(&s);
 
+    fn evaluate(&self) -> usize {
+        match self {
+            Packet::Literal {
+                version: _version,
+                value,
+            } => *value,
+            Packet::Operator {
+                version: _version,
+                sub_packets,
+                operator: op,
+            } => {
+                let packets: Vec<usize> = sub_packets.iter().map(|p| p.evaluate()).collect();
+
+                match op {
+                    Op::Sum => packets.iter().sum(),
+                    Op::Product => packets.iter().product(),
+                    Op::Min => *packets.iter().min().unwrap(),
+                    Op::Max => *packets.iter().max().unwrap(),
+                    Op::Gt => {
+                        if packets[0] > packets[1] {
+                            1
+                        } else {
+                            0
+                        }
+                    }
+                    Op::Lt => {
+                        if packets[0] < packets[1] {
+                            1
+                        } else {
+                            0
+                        }
+                    }
+                    Op::Eq => {
+                        if packets[0] == packets[1] {
+                            1
+                        } else {
+                            0
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn parse(mut s: Bits) -> (Packet, Bits) {
         let substring = s.drain(0..3).collect();
         let version: usize = binary_string_to_num(&substring);
 
@@ -64,12 +108,7 @@ impl Packet {
             if length_type_id[0] == '0' {
                 // total length in bits (15)
                 let sub_packets_size = binary_string_to_num(&s.drain(0..15).collect::<Bits>());
-
                 let mut sub_packets_bits: Bits = s.drain(0..sub_packets_size).collect();
-
-                //                print!("subp   : ");
-                //pp_bits(&sub_packets_bits);
-
                 let mut sub_packets: Vec<Packet> = Vec::new();
 
                 while !sub_packets_bits.is_empty() {
@@ -80,9 +119,10 @@ impl Packet {
                 }
 
                 return (
-                    Packet::OperatorFixedSize {
+                    Packet::Operator {
                         version,
                         sub_packets,
+                        operator: type_to_operator(type_id),
                     },
                     s,
                 );
@@ -99,9 +139,10 @@ impl Packet {
                 }
 
                 return (
-                    Packet::OperatorFixedCount {
+                    Packet::Operator {
                         version,
                         sub_packets,
+                        operator: type_to_operator(type_id),
                     },
                     s,
                 );
@@ -110,31 +151,31 @@ impl Packet {
     }
 }
 
+fn type_to_operator(type_id: usize) -> Op {
+    match type_id {
+        0 => Op::Sum,
+        1 => Op::Product,
+        2 => Op::Min,
+        3 => Op::Max,
+        5 => Op::Gt,
+        6 => Op::Lt,
+        7 => Op::Eq,
+        _ => panic!("Invalid Operator"),
+    }
+}
+
 fn parse_literal_value(mut remaining: Bits) -> (usize, Bits) {
     let mut value: Bits = Vec::new();
 
     loop {
         let bits: Bits = remaining.drain(0..5).collect();
-        // print!("consumed: ");
-        // pp_bits(&bits);
-        // print!("remaining: ");
-        // pp_bits(&bits);
-
         let mut sub = bits[1..5].to_vec();
         value.append(&mut sub);
-        //        value += binary_string_to_num(&bits[1..5].to_vec());
 
         if bits[0] == '0' {
             break;
         }
     }
-
-    // // Drop padded bits if any
-    // if bits_consumed % 4 != 0 {
-    //     let to_drop = 4 - (bits_consumed % 4);
-    //     println!("Dropping {} bits", to_drop);
-    //     remaining.drain(0..to_drop);
-    // }
 
     let v = binary_string_to_num(&value);
     (v, remaining)
@@ -164,7 +205,7 @@ fn main() {
     println!("\nexample 2: {:?}", &r);
 
     assert_eq!(
-        Packet::OperatorFixedSize {
+        Packet::Operator {
             version: 1,
             sub_packets: vec![
                 Packet::Literal {
@@ -175,7 +216,8 @@ fn main() {
                     version: 2,
                     value: 20
                 }
-            ]
+            ],
+            operator: Op::Lt
         },
         r.0
     );
@@ -186,7 +228,7 @@ fn main() {
     println!("\nexample 3: {:?}", &r);
 
     assert_eq!(
-        Packet::OperatorFixedCount {
+        Packet::Operator {
             version: 7,
             sub_packets: vec![
                 Packet::Literal {
@@ -201,7 +243,8 @@ fn main() {
                     version: 1,
                     value: 3
                 }
-            ]
+            ],
+            operator: Op::Max
         },
         r.0
     );
@@ -209,31 +252,11 @@ fn main() {
     let binary_str = hex_string_to_binary_string(&String::from(input()));
     let r = Packet::parse(binary_str);
 
-    //println!("\ninput: {:?}", &r);
     let total = r.0.sum_versions();
-    println!("sum: {}", total);
+    let result = r.0.evaluate();
+    println!("sum: {}, result: {}", total, result);
     assert_eq!(940, total);
-
-    // assert_eq!(
-    //     Packet::OperatorFixedCount {
-    //         version: 7,
-    //         sub_packets: vec![
-    //             Packet::Literal {
-    //                 version: 2,
-    //                 value: 1
-    //             },
-    //             Packet::Literal {
-    //                 version: 4,
-    //                 value: 2
-    //             },
-    //             Packet::Literal {
-    //                 version: 1,
-    //                 value: 3
-    //             }
-    //         ]
-    //     },
-    //     r.0
-    // );
+    assert_eq!(13476220616073, result);
 }
 
 fn hex_string_to_binary_string(s: &String) -> Bits {
