@@ -8,3 +8,5 @@
 **/target
 **/*.rs.bk
 /.direnv
+/2025/.zig-cache/
+/2025/zig-out/
